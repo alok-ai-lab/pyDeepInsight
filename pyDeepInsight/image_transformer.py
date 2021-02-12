@@ -15,7 +15,7 @@ class ImageTransformer:
 
     """
 
-    def __init__(self, feature_extractor='tsne', pixels=100,
+    def __init__(self, feature_extractor='tsne', pixels=100, perplexity=30.0,
                  random_state=None, n_jobs=None):
         """Generate an ImageTransformer instance
 
@@ -37,7 +37,7 @@ class ImageTransformer:
             fe = feature_extractor.casefold()
             if fe == 'tsne'.casefold():
                 fe = TSNE(
-                    n_components=2, metric='cosine',
+                    n_components=2, perplexity=perplexity, metric='cosine',
                     random_state=self.random_state,
                     n_jobs=self.n_jobs)
             elif fe == 'pca'.casefold():
