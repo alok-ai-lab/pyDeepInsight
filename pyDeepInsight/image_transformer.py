@@ -175,7 +175,7 @@ class ImageTransformer:
         if format=='rgb':
             img_matrices = np.array([self._mat_to_rgb(m) for m in img_matrices])
         elif format=='scalar':
-            np.stack(img_matrices)
+            img_matrices = np.stack(img_matrices)
         else:
             raise ValueError(("'{}' not accepted for parameter 'format'")
                              .format(format))
