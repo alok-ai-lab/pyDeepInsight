@@ -1,4 +1,4 @@
-# DeepInsight
+# pyDeepInsight
 
 This repository contains the original MatLab code for DeepInsight as described in 
 the paper [DeepInsight: A methodology to transform a non-image data to an image 
