@@ -6,10 +6,10 @@ install_requires = [
 ]
 
 setup(
-    name='DeepInsight',
+    name='pyDeepInsight',
     version='0.1.0',
     packages=['pyDeepInsight'],
-    url='https://github.com/alok-ai-lab/deepinsight',
+    url='https://github.com/alok-ai-lab/pyDeepInsight',
     license='GPLv3',
     author='Keith A. Boroevich',
     author_email='kaboroevich@gmail.com',
