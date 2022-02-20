@@ -8,7 +8,7 @@ give the same results as the published MatLab code and should be considered
 experimental.
 
 ## Installation
-    python3 -m pip -q install git+https://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
+    python3 -m pip -q install git+https://github.com/alok-ai-lab/pyDeepInsight.git#egg=pyDeepInsight
     
 [1]: https://doi.org/10.1038/s41598-019-47765-6
 
