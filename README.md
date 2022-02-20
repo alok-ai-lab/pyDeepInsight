@@ -1,14 +1,11 @@
 # pyDeepInsight
 
-This repository contains the original MatLab code for DeepInsight as described in 
-the paper [DeepInsight: A methodology to transform a non-image data to an image 
-for convolution neural network architecture][1].
-
-# pyDeepInsight
-
-This package provides a python version of the image transformation procedure of 
-DeepInsight. This is not guaranteed to give the same results as the published
-MatLab code and should be considered experimental.
+This package provides a python implementation of 
+[alok-ai-lab/DeepInsight](https://github.com/alok-ai-lab/DeepInsight) as originally 
+described in *[DeepInsight: A methodology to transform a non-image data to an 
+image for convolution neural network architecture][1]*. This is not guaranteed to 
+give the same results as the published MatLab code and should be considered 
+experimental.
 
 ## Installation
     python3 -m pip -q install git+https://github.com/alok-ai-lab/pyDeepInsight.git#egg=pyDeepInsight
