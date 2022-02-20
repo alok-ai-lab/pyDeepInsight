@@ -7,7 +7,7 @@ install_requires = [
 
 setup(
     name='pyDeepInsight',
-    version='0.1.0',
+    version='0.1.1',
     packages=['pyDeepInsight'],
     url='https://github.com/alok-ai-lab/pyDeepInsight',
     license='GPLv3',
