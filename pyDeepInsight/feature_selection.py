@@ -66,6 +66,7 @@ class CAMFeatureSelector:
             else:
                 resolved_target = submodule_dict[target_layer]
         elif target_layer is None:
+            model.eval()
             target_layer = locate_candidate_layer(self.model)
             resolved_target = submodule_dict[target_layer]
 
