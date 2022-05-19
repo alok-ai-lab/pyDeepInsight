@@ -3,6 +3,7 @@ from setuptools import setup
 install_requires = [
     'scikit-learn>=0.22',
     'pandas',
+    'torch'
 ]
 
 setup(

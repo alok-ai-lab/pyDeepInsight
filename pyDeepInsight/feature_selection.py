@@ -15,7 +15,7 @@ class CAMFeatureSelector:
     (CAM).
 
     This class takes a trained model and it's training data to identify
-    features important to prediction of each class.
+    important features to prediction of each class.
     """
 
     def __init__(self, model: nn.Module,
@@ -66,7 +66,6 @@ class CAMFeatureSelector:
             else:
                 resolved_target = submodule_dict[target_layer]
         elif target_layer is None:
-            model.eval()
             target_layer = locate_candidate_layer(self.model)
             resolved_target = submodule_dict[target_layer]
 
@@ -84,7 +83,6 @@ class CAMFeatureSelector:
             use_cuda: Whether to use cuda for calculating CAMs
         Return:
             A numpy array of CAMs
-
         """
         activations = np.empty((0, X.shape[-2], X.shape[-1]))
         ds = TensorDataset(X, y)
@@ -109,11 +107,12 @@ class CAMFeatureSelector:
         """Flatten multiple CAMs into a single CAM.
 
         Args:
-            cams: numpy array of CAMs
+            cams: ndarray of CAMs
             method: Method to flatten CAMs. When used with feature selection
                 threshold, max is essentially a union operation, and min is an
                 intersect operation.
-
+        Returns:
+            A numpy array
         """
         if method == "mean":
             flat_cam = np.mean(cams, axis=0)
@@ -128,6 +127,16 @@ class CAMFeatureSelector:
     @staticmethod
     def flatten_classes(labels: np.ndarray, cam: np.ndarray,
                         method: str = "mean") -> Dict[int, np.ndarray]:
+        """
+
+        Args:
+            labels: class labels for cam array
+            cam: ndarray of CAMs
+            method: method to merge CAMs per class passed to .flatten_cam()
+        Returns:
+             A dictionary with class labels as keys and
+             a single CAM as the value
+        """
         cats = np.unique(labels)
         cat_cam = {}
         for cat in cats:
@@ -150,7 +159,7 @@ class CAMFeatureSelector:
                 essentially a union operation, and 'min' is an
                 intersect operation.
         Returns:
-            A dictionary with classes as keys and the flattened CAM as value
+            A dictionary with classes as keys and the flattened CAM as values
         """
         use_cuda = X.is_cuda
         activations = self.compute_cam(X=X, y=y, batch_size=batch_size,
@@ -162,7 +171,19 @@ class CAMFeatureSelector:
         return cat_cam
 
     def select_class_features(self, cams: Dict[int, np.ndarray],
-                              threshold: float=0.6) -> Dict[int, np.ndarray]:
+                              threshold: float = 0.6) -> Dict[int, np.ndarray]:
+        """Select features for each class using class-specific CAMs. Input
+        feature coordinates are filtered based on activation at same
+        coordinates.
+
+        Args:
+            cams: A dictionary with classes as keys and a CAM as values
+            threshold: Activation cutoff for feature importance
+        Returns:
+            A dictionary with classes as keys and an array of feature indices
+            as values
+
+        """
         class_idx = {}
         for cat, cam in cams.items():
             cam_pass = np.stack(np.where(cam >= threshold)).T
