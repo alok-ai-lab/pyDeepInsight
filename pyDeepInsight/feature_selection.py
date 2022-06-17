@@ -1,4 +1,4 @@
-from typing import Union, Optional, Dict
+from typing import Union, Optional
 from .image_transformer import ImageTransformer
 
 import numpy as np
@@ -25,7 +25,7 @@ class CAMFeatureSelector:
         """Generate a CAMFeatureSelector instance
 
         Args:
-            model: trained CNN model
+            model: trained pytorch.nn.Module CNN model
             it: ImageTransformer class used to create the images that trained
                 the model
             target_layer: the target layer of the model, the name of the
@@ -126,16 +126,16 @@ class CAMFeatureSelector:
 
     @staticmethod
     def flatten_classes(labels: np.ndarray, cam: np.ndarray,
-                        method: str = "mean") -> Dict[int, np.ndarray]:
-        """
+                        method: str = "mean") -> dict[int, np.ndarray]:
+        """Flatten CAMs across all classes
 
         Args:
             labels: class labels for cam array
             cam: ndarray of CAMs
             method: method to merge CAMs per class passed to .flatten_cam()
         Returns:
-             A dictionary with class labels as keys and
-             a single CAM as the value
+             A dictionary with class labels as keys and a single CAM as
+             the value
         """
         cats = np.unique(labels)
         cat_cam = {}
@@ -148,7 +148,7 @@ class CAMFeatureSelector:
 
     def calculate_class_activations(self, X: Tensor, y: Tensor,
                                     batch_size: int = 1, flatten_method="mean"
-                                    ) -> Dict[int, np.ndarray]:
+                                    ) -> dict[int, np.ndarray]:
         """Calculate CAM for each input then flatten for each class.
 
         Args:
@@ -170,8 +170,8 @@ class CAMFeatureSelector:
 
         return cat_cam
 
-    def select_class_features(self, cams: Dict[int, np.ndarray],
-                              threshold: float = 0.6) -> Dict[int, np.ndarray]:
+    def select_class_features(self, cams: dict[int, np.ndarray],
+                              threshold: float = 0.6) -> dict[int, np.ndarray]:
         """Select features for each class using class-specific CAMs. Input
         feature coordinates are filtered based on activation at same
         coordinates.
