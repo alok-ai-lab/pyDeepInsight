@@ -3,7 +3,7 @@
 This package provides a python implementation of 
 [alok-ai-lab/DeepInsight](https://github.com/alok-ai-lab/DeepInsight) as originally 
 described in [*DeepInsight: A methodology to transform a non-image data to an 
-image for convolution neural network architecture*][1] [[1]](#1). This is not guaranteed to 
+image for convolution neural network architecture*][1] [\[1\]](#1). This is not guaranteed to 
 give the same results as the published MatLab code and should be considered 
 experimental.
 
@@ -60,7 +60,7 @@ minimum size expected by [torchvision models][4].
 
 Extracts important features from a trained PyTorch model using class activation mapping
 (CAM) as proposed in [*DeepFeature: feature selection in nonimage data using 
-convolutional neural network*][5] [[2]](#2).
+convolutional neural network*][5] [\[2\]](#2).
 
 [5]: https://doi.org/10.1093/bib/bbab297
 [6]: https://pytorch.org/
@@ -79,10 +79,10 @@ the images used to train the **model**.
 Can be specified using the name provided by [nn.Module.named_modules][8] or a 
 by providing a pointer to the layer directly. If no layer is specified, the 
 last non-reduced convolutional layer is selected as determined by 
-the 'locate_candidate_layer' method of the [TorchCAM][9] [[3]](#3) package by 
+the 'locate_candidate_layer' method of the [TorchCAM][9] [\[3\]](#3) package by 
 François-Guillaume Fernandez.
 * **cam_method**: the name of a CAM method class provided by the 
-[pytorch_grad_cam][10] [[4]](#4) package by Jacob Gildenblat. Default is "GradCAM".
+[pytorch_grad_cam][10] [\[4\]](#4) package by Jacob Gildenblat. Default is "GradCAM".
 
 [7]: https://pytorch.org/docs/stable/generated/torch.nn.Module.html
 [8]: https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.named_modules
@@ -123,14 +123,14 @@ in the logarithmic scale.
 
 ## References
 
-<a id="1">[1]</a>
+<a id="1">\[1\]</a>
 Sharma A, Vans E, Shigemizu D, Boroevich KA, & Tsunoda T. DeepInsight: A methodology to transform a non-image data to an image for convolution neural network architecture. *Sci Rep* **9**, 11399 (2019). https://doi.org/10.1038/s41598-019-47765-6
 
-<a id="2">[2]</a>
-Sharma A, Lysenko A, Boroevich KA, Vans E, & Tsunoda T. DeepFeature: feature selection in nonimage data using convolutional neural network, *Briefings in Bioinformatics*, Volume 22, Issue 6, November 2021, bbab297, https://doi.org/10.1093/bib/bbab297
+<a id="2">\[2\]</a>
+Sharma A, Lysenko A, Boroevich KA, Vans E, & Tsunoda T. DeepFeature: feature selection in nonimage data using convolutional neural network, *Briefings in Bioinformatics*, Volume 22, Issue 6, November 2021, bbab297. https://doi.org/10.1093/bib/bbab297
 
-<a id="3">[3]</a>
+<a id="3">\[3\]</a>
 François-Guillaume Fernandez. (2020). TorchCAM: class activation explorer. https://github.com/frgfm/torch-cam
 
-<a id="4">[4]</a>
+<a id="4">\[4\]</a>
 Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https://github.com/jacobgil/pytorch-grad-cam
