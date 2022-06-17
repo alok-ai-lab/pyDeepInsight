@@ -1,14 +1,17 @@
+from typing import Union, Any, Optional
+from typing_extensions import Protocol
+from numpy.typing import ArrayLike
+
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans
 from scipy.spatial import ConvexHull
+from scipy.spatial.distance import cdist
+from scipy.optimize import linear_sum_assignment
 from matplotlib import pyplot as plt
 import inspect
-
-from typing import Union, Tuple, Any, Optional
-from typing_extensions import Protocol
-from numpy.typing import ArrayLike
 
 
 class ManifoldLearner(Protocol):
@@ -25,30 +28,28 @@ class ImageTransformer:
     """
 
     def __init__(self, feature_extractor: Union[str, ManifoldLearner] = 'tsne',
-                 pixels: Union[int, Tuple[int, int]] = (224, 224),
-                 random_state: Optional[int] = None,
-                 n_jobs: Optional[int] = None) -> None:
+                 discretization: str = 'bin',
+                 pixels: Union[int, tuple[int, int]] = (224, 224)) -> None:
         """Generate an ImageTransformer instance
 
         Args:
             feature_extractor: string of value ('tsne', 'pca', 'kpca') or a
                 class instance with method `fit_transform` that returns a
                 2-dimensional array of extracted features.
+            discretization: string of values ('bin', 'assignment'). Defines
+                the method for discretizing dimensionally reduced data to pixel
+                coordinates.
             pixels: int (square matrix) or tuple of ints (height, width) that
                 defines the size of the image matrix.
-            random_state: int or RandomState. Determines the random number
-                generator, if present, of a string defined feature_extractor.
-            n_jobs: The number of parallel jobs to run for a string defined
-                feature_extractor.
         """
-        self._fe = self._parse_feature_extractor(
-            feature_extractor, random_state, n_jobs)
+        self._fe = self._parse_feature_extractor(feature_extractor)
+        self._dm = self._parse_discretization(discretization)
         self._pixels = self._parse_pixels(pixels)
         self._xrot = np.empty(0)
         self._coords = np.empty(0)
 
     @staticmethod
-    def _parse_pixels(pixels: Union[int, Tuple[int, int]]) -> Tuple[int, int]:
+    def _parse_pixels(pixels: Union[int, tuple[int, int]]) -> tuple[int, int]:
         """Check and correct pixel parameter
 
         Args:
@@ -61,9 +62,7 @@ class ImageTransformer:
 
     @staticmethod
     def _parse_feature_extractor(
-            feature_extractor: Union[str, ManifoldLearner],
-            random_state: Optional[int], n_jobs: Optional[int]
-    ) -> ManifoldLearner:
+            feature_extractor: Union[str, ManifoldLearner]) -> ManifoldLearner:
         """Validate the feature extractor value passed to the
         constructor method and return correct method
 
@@ -71,22 +70,18 @@ class ImageTransformer:
             feature_extractor: string of value ('tsne', 'pca', 'kpca') or a
                 class instance with method `fit_transform` that returns a
                 2-dimensional array of extracted features.
+
+        Returns:
+            function
         """
         if isinstance(feature_extractor, str):
             fe = feature_extractor.casefold()
             if fe == 'tsne'.casefold():
-                fe_func = TSNE(
-                    n_components=2, metric='cosine',
-                    random_state=random_state,
-                    n_jobs=n_jobs)
+                fe_func = TSNE(n_components=2, metric='cosine')
             elif fe == 'pca'.casefold():
-                fe_func = PCA(n_components=2,
-                              random_state=random_state)
+                fe_func = PCA(n_components=2)
             elif fe == 'kpca'.casefold():
-                fe_func = KernelPCA(
-                    n_components=2, kernel='rbf',
-                    random_state=random_state,
-                    n_jobs=n_jobs)
+                fe_func = KernelPCA(n_components=2, kernel='rbf')
             else:
                 raise ValueError(
                     f"feature_extractor '{feature_extractor}' not valid")
@@ -98,8 +93,112 @@ class ImageTransformer:
                             'string nor has method "fit_transform"')
         return fe_func
 
-    def fit(self, X: np.ndarray, y: ArrayLike = None,
-            plot: bool = False) -> None:
+    @staticmethod
+    def _parse_discretization(method: str):
+        """Validate the discretization value passed to the
+        constructor method and return correct function
+
+        Args:
+            method: string of value ('bin', 'assignment')
+
+        Returns:
+            function
+        """
+        if method == 'bin':
+            func = ImageTransformer.coordinate_binning
+        elif method == 'assignment':
+            func = ImageTransformer.coordinate_assignment
+        else:
+            raise ValueError(f"discretization method '{method}' not valid")
+        return func
+
+    @staticmethod
+    def coordinate_binning(position: np.ndarray,
+                           px_size: tuple[int, int]) -> np.ndarray:
+        """Determine the pixel locations of each feature based on the overlap of
+        feature position and pixel locations.
+
+        Args:
+            position: a 2d array of feature coordinates
+            px_size: tuple with image dimensions
+
+        Returns:
+            a 2d array of feature to pixel mappings
+        """
+        scaled = ImageTransformer.scale_coordinates(position, px_size)
+        px_binned = np.floor(scaled).astype(int)
+        # Need to move maximum values into the lower bin
+        px_binned[:, 0][px_binned[:, 0] == px_size[0]] = px_size[0] - 1
+        px_binned[:, 1][px_binned[:, 1] == px_size[1]] = px_size[1] - 1
+        return px_binned
+
+    @staticmethod
+    def coordinate_assignment(position: np.ndarray,
+                              px_size: tuple[int, int]) -> np.ndarray:
+        """Determine the pixel location of each feature using a linear sum
+        assignment problem solution on the exponential on the euclidean
+        distances between the features and the pixels
+
+        Args:
+            position: a 2d array of feature coordinates
+            px_size: tuple with image dimensions
+
+        Returns:
+            a 2d array of feature to pixel mappings
+        """
+        scaled = ImageTransformer.scale_coordinates(position, px_size)
+        px_centers = ImageTransformer.calculate_pixel_centroids(px_size)
+
+        # calculate distances
+        k = np.prod(px_size)
+        clustered = scaled.shape[0] > k
+        if clustered:
+            kmeans = KMeans(n_clusters=k).fit(scaled)
+            cl_labels = kmeans.labels_
+            cl_centers = kmeans.cluster_centers_
+            dist = cdist(cl_centers, px_centers, metric='euclidean')
+        else:
+            dist = cdist(position, px_centers, metric='euclidean')
+        # calculate exponential of the distances to prioritize short distances
+        edist = np.exp(dist)
+        # assignment of features/clusters to pixels
+        lsa = linear_sum_assignment(edist)
+        px_assigned = np.empty(position.shape, dtype=int)
+        for i in range(position.shape[0]):
+            if clustered:
+                # The feature at i
+                # Is mapped to the cluster j=clabl[i]
+                # Which is mapped to the pixel center clust_cntr[j]
+                # Which is mapped to the pixel k = lsa[1][j]
+                # For pixel k, x = k % px_size[0] and y = k // px_size[0]
+                j = cl_labels[i]
+            else:
+                j = i
+            ki = lsa[1][j]
+            xi = ki % px_size[0]
+            yi = ki // px_size[0]
+            px_assigned[i] = [yi, xi]
+        return px_assigned
+
+    @staticmethod
+    def calculate_pixel_centroids(px_size: tuple[int, int]) -> np.ndarray:
+        """Generate a 2d array of the centroid of each pixel
+
+        Args:
+            px_size: tuple with image dimensions
+
+        Returns:
+            a 2d array of pixel centroid locations
+        """
+        px_map = np.empty((np.prod(px_size), 2))
+        for i in range(0, px_size[0]):
+            for j in range(0, px_size[1]):
+                px_map[i * px_size[0] + j] = [i, j]
+        px_centroid = px_map + 0.5
+        return px_centroid
+
+    def fit(self, X: np.ndarray, y: Optional[ArrayLike] = None,
+            plot: bool = False):
         """Train the image transformer from the training set (X)
 
         Args:
@@ -132,9 +231,10 @@ class ImageTransformer:
             plt.fill(mbr[:, 0], mbr[:, 1], edgecolor='g', fill=False)
             plt.gca().set_aspect('equal', adjustable='box')
             plt.show()
+        return self
 
     @property
-    def pixels(self) -> Tuple[int, int]:
+    def pixels(self) -> tuple[int, int]:
         """The image matrix dimensions
 
         Returns:
@@ -144,7 +244,7 @@ class ImageTransformer:
         return self._pixels
 
     @pixels.setter
-    def pixels(self, pixels: Union[int, Tuple[int, int]]):
+    def pixels(self, pixels: Union[int, tuple[int, int]]) -> None:
         """Set the image matrix dimension
 
         Args:
@@ -159,21 +259,31 @@ class ImageTransformer:
         if hasattr(self, '_coords'):
             self._calculate_coords()
 
+    @staticmethod
+    def scale_coordinates(coords: np.ndarray, dim_max: ArrayLike) -> np.ndarray:
+        """Transforms a list of n-dimensional coordinates by scaling them
+        between zero and the given dimensional maximum
+
+        Args:
+            coords: a 2d ndarray of coordinates
+            dim_max: a list of maximum ranges for each dimension of coords
+
+        Returns:
+            a 2d ndarray of scaled coordinates
+        """
+        data_min = coords.min(axis=0)
+        data_max = coords.max(axis=0)
+        std = (coords - data_min) / (data_max - data_min)
+        scaled = np.multiply(std, dim_max)
+        return scaled
+
     def _calculate_coords(self) -> None:
         """Calculate the matrix coordinates of each feature based on the
         pixel dimensions.
         """
-        ax0_coord = np.digitize(
-            self._xrot[:, 0],
-            bins=np.linspace(min(self._xrot[:, 0]), max(self._xrot[:, 0]),
-                             self._pixels[0])
-        ) - 1
-        ax1_coord = np.digitize(
-            self._xrot[:, 1],
-            bins=np.linspace(min(self._xrot[:, 1]), max(self._xrot[:, 1]),
-                             self._pixels[1])
-        ) - 1
-        self._coords = np.stack((ax0_coord, ax1_coord), axis=1)
+        scaled = self.scale_coordinates(self._xrot, self._pixels)
+        px_coords = self._dm(scaled, self._pixels)
+        self._coords = px_coords
 
     def transform(self, X: np.ndarray, img_format: str = 'rgb',
                   empty_value: int = 0) -> np.ndarray:
@@ -207,7 +317,7 @@ class ImageTransformer:
                        img_coords[1].astype(int)] = img_coords[z]
             img_list.append(img_matrix)
 
-        img_matrices = np.empty(0)
+        # img_matrices = np.empty(0) ---- REMOVE?
         if img_format == 'rgb':
             img_matrices = np.array([self._mat_to_rgb(m) for m in img_list])
         elif img_format == 'scalar':
@@ -251,7 +361,7 @@ class ImageTransformer:
 
     @staticmethod
     def _minimum_bounding_rectangle(hull_points: np.ndarray
-                                    ) -> Tuple[np.ndarray, np.ndarray]:
+                                    ) -> tuple[np.ndarray, np.ndarray]:
         """Find the smallest bounding rectangle for a set of points.
 
         Modified from JesseBuesking at https://stackoverflow.com/a/33619018
@@ -326,14 +436,13 @@ class LogScaler:
     DeepInsight paper supplementary information.
     """
 
-    def __init__(self):
-        self._min0 = None
-        self._max = None
+    def __init__(self) -> None:
         pass
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         self._min0 = X.min(axis=0)
         self._max = np.log(X + np.abs(self._min0) + 1).max()
+        return self
 
     def fit_transform(self, X: np.ndarray, y: Optional[np.ndarray] = None
                       ) -> np.ndarray:
