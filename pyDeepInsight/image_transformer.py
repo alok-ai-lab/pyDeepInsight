@@ -1,4 +1,4 @@
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, Tuple
 from typing_extensions import Protocol
 from numpy.typing import ArrayLike
 
@@ -29,7 +29,7 @@ class ImageTransformer:
 
     def __init__(self, feature_extractor: Union[str, ManifoldLearner] = 'tsne',
                  discretization: str = 'bin',
-                 pixels: Union[int, tuple[int, int]] = (224, 224)) -> None:
+                 pixels: Union[int, Tuple[int, int]] = (224, 224)) -> None:
         """Generate an ImageTransformer instance
 
         Args:
@@ -49,7 +49,7 @@ class ImageTransformer:
         self._coords = np.empty(0)
 
     @staticmethod
-    def _parse_pixels(pixels: Union[int, tuple[int, int]]) -> tuple[int, int]:
+    def _parse_pixels(pixels: Union[int, Tuple[int, int]]) -> Tuple[int, int]:
         """Check and correct pixel parameter
 
         Args:
@@ -114,7 +114,7 @@ class ImageTransformer:
 
     @staticmethod
     def coordinate_binning(position: np.ndarray,
-                           px_size: tuple[int, int]) -> np.ndarray:
+                           px_size: Tuple[int, int]) -> np.ndarray:
         """Determine the pixel locations of each feature based on the overlap of
         feature position and pixel locations.
 
@@ -134,7 +134,7 @@ class ImageTransformer:
 
     @staticmethod
     def coordinate_assignment(position: np.ndarray,
-                              px_size: tuple[int, int]) -> np.ndarray:
+                              px_size: Tuple[int, int]) -> np.ndarray:
         """Determine the pixel location of each feature using a linear sum
         assignment problem solution on the exponential on the euclidean
         distances between the features and the pixels
@@ -181,7 +181,7 @@ class ImageTransformer:
         return px_assigned
 
     @staticmethod
-    def calculate_pixel_centroids(px_size: tuple[int, int]) -> np.ndarray:
+    def calculate_pixel_centroids(px_size: Tuple[int, int]) -> np.ndarray:
         """Generate a 2d array of the centroid of each pixel
 
         Args:
@@ -234,7 +234,7 @@ class ImageTransformer:
         return self
 
     @property
-    def pixels(self) -> tuple[int, int]:
+    def pixels(self) -> Tuple[int, int]:
         """The image matrix dimensions
 
         Returns:
@@ -244,7 +244,7 @@ class ImageTransformer:
         return self._pixels
 
     @pixels.setter
-    def pixels(self, pixels: Union[int, tuple[int, int]]) -> None:
+    def pixels(self, pixels: Union[int, Tuple[int, int]]) -> None:
         """Set the image matrix dimension
 
         Args:
@@ -361,7 +361,7 @@ class ImageTransformer:
 
     @staticmethod
     def _minimum_bounding_rectangle(hull_points: np.ndarray
-                                    ) -> tuple[np.ndarray, np.ndarray]:
+                                    ) -> Tuple[np.ndarray, np.ndarray]:
         """Find the smallest bounding rectangle for a set of points.
 
         Modified from JesseBuesking at https://stackoverflow.com/a/33619018

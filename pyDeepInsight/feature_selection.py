@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union, Optional, Dict
 from .image_transformer import ImageTransformer
 
 import numpy as np
@@ -126,7 +126,7 @@ class CAMFeatureSelector:
 
     @staticmethod
     def flatten_classes(labels: np.ndarray, cam: np.ndarray,
-                        method: str = "mean") -> dict[int, np.ndarray]:
+                        method: str = "mean") -> Dict[int, np.ndarray]:
         """Flatten CAMs across all classes
 
         Args:
@@ -148,7 +148,7 @@ class CAMFeatureSelector:
 
     def calculate_class_activations(self, X: Tensor, y: Tensor,
                                     batch_size: int = 1, flatten_method="mean"
-                                    ) -> dict[int, np.ndarray]:
+                                    ) -> Dict[int, np.ndarray]:
         """Calculate CAM for each input then flatten for each class.
 
         Args:
@@ -170,8 +170,8 @@ class CAMFeatureSelector:
 
         return cat_cam
 
-    def select_class_features(self, cams: dict[int, np.ndarray],
-                              threshold: float = 0.6) -> dict[int, np.ndarray]:
+    def select_class_features(self, cams: Dict[int, np.ndarray],
+                              threshold: float = 0.6) -> Dict[int, np.ndarray]:
         """Select features for each class using class-specific CAMs. Input
         feature coordinates are filtered based on activation at same
         coordinates.
