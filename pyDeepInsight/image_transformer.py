@@ -158,13 +158,13 @@ class ImageTransformer:
             cl_centers = kmeans.cluster_centers_
             dist = cdist(cl_centers, px_centers, metric='euclidean')
         else:
-            dist = cdist(position, px_centers, metric='euclidean')
+            dist = cdist(scaled, px_centers, metric='euclidean')
         # calculate exponential of the distances to prioritize short distances
         edist = np.exp(dist)
         # assignment of features/clusters to pixels
         lsa = linear_sum_assignment(edist)
-        px_assigned = np.empty(position.shape, dtype=int)
-        for i in range(position.shape[0]):
+        px_assigned = np.empty(scaled.shape, dtype=int)
+        for i in range(scaled.shape[0]):
             if clustered:
                 # The feature at i
                 # Is mapped to the cluster j=clabl[i]
