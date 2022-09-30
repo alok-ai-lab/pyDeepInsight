@@ -341,6 +341,29 @@ class ImageTransformer:
         self.fit(X)
         return self.transform(X, **kwargs)
 
+    def inverse_transform(self, img: np.ndarray) -> np.ndarray:
+        """Transform an image layer back to its original space.
+            Args:
+                img:
+
+            Returns:
+                A list of n_samples numpy matrices of dimensions set by
+                the pixel parameter
+        """
+        if img.ndim == 2 and img.shape == self._pixels:
+            X = img[self._coords[:,0], self._coords[:,1]]
+        elif img.ndim == 3 and img.shape[-2:] == self._pixels:
+            X = img[:, self._coords[:, 0], self._coords[:, 1]]
+        elif img.ndim == 3 and img.shape[0:2] == self._pixels:
+            X = img[self._coords[:,0], self._coords[:,1], :]
+        elif img.ndim == 4 and img.shape[1:3] == self._pixels:
+            X = img[:, self._coords[:, 0], self._coords[:, 1], :]
+        else:
+            raise ValueError((f"Expected dimensions of (B, {self._pixels[0]}, "
+                              f"{self._pixels[1]}, C) where B and C are "
+                              f"optional, but got {img.shape}"))
+        return X
+
     def feature_density_matrix(self) -> np.ndarray:
         """Generate image matrix with feature counts per pixel
 
