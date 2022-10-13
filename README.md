@@ -93,33 +93,6 @@ CAM for each input then flatten for each class.
 class-specific CAMs. Input feature coordinates are filtered based on activation at same 
 coordinates.
 
-<a id='logscaler'></a>
-### LogScaler Class
-
-Performs log normalization and scaling procedure as described as norm-2 in the
-[DeepInsight paper supplementary information][disi].
-This method attempts keep the topology of the features by using a global maximum 
-in the logarithmic scale. 
-
-
-
-```python
->>> from pyDeepInsight import LogScaler
->>> import numpy as np
->>> data = np.ndarray([[-1, 2], [-0.5, 6], [0, 10], [1, 18]])
->>> scaler = LogScaler()
->>> _ = scalar.fit(data)
->>> print(scaler._min0, scaler._max)
-[-1.  2.] 3.044522437723423
->>> print(scaler.transform(data))
-[[0.         0.52863395]
- [0.13317856 0.72169761]
- [0.22767025 0.84248003]
- [0.36084881 1.        ]]
->>> print(scaler.transform([[2, 2]]))
-[0.4553405  0.52863395]
-```
-
 ## Example Jupyter Notebooks
 
 * [Classification of TCGA data using SqueezeNet](./examples/pytorch_squeezenet.ipynb)
