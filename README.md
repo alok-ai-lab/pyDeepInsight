@@ -96,7 +96,7 @@ coordinates.
 ## Example Jupyter Notebooks
 
 * [Classification of TCGA data using SqueezeNet](./examples/pytorch_squeezenet.ipynb)
-* [Feature Selection using GradCAM](./examples/pytorch_squeezenet.ipynb)
+* [Feature Selection using GradCAM](./examples/cam_feature_selection.ipynb)
 
 ## References
 
