@@ -1,9 +1,14 @@
 from setuptools import setup
 
 install_requires = [
+    'numpy',
+    'scipy',
     'scikit-learn>=0.22',
     'pandas',
-    'torch'
+    'matplotlib',
+    'torch',
+    'grad_cam',
+    'torchcam'
 ]
 
 setup(
@@ -17,7 +22,4 @@ setup(
     description='A methodology to transform a non-image data to an image for'
                 ' convolution neural network architecture',
     install_requires=install_requires,
-    extras_require={
-        'ImageTransformer_fit_plot': ['matplotlib']
-    }
 )
