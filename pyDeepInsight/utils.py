@@ -52,7 +52,7 @@ class StratifiedBinaryBatchSampler(Sampler):
         if not isinstance(batch_size, int) or batch_size <= 0:
             raise ValueError("batch_size should be a positive integer value, "
                              "but got batch_size={}".format(batch_size))
-        self.events = torch.as_tensor(events, dtype=torch.int)
+        self.events = torch.as_tensor(events, dtype=torch.int64)
         self.batch_size = batch_size
 
         self.events0_idx = torch.where(self.events == 0)[0]
@@ -74,25 +74,25 @@ class StratifiedBinaryBatchSampler(Sampler):
 
     def __iter0__(self):
         """Iterate the non-event (0) label sampler"""
-        batch = torch.tensor([], dtype=torch.int)
+        batch = torch.tensor([], dtype=torch.int64)
         for idx in self.sampler0:
             idx0 = self.events0_idx[idx, None]
             batch = torch.cat((batch, idx0), 0)
             if batch.shape[0] == self.batch0_size:
                 yield batch
-                batch = torch.tensor([], dtype=torch.int)
+                batch = torch.tensor([], dtype=torch.int64)
         if batch.shape[0] > 0:
             yield batch
 
     def __iter1__(self):
         """Iterate the event (0) label sampler"""
-        batch = torch.tensor([], dtype=torch.int)
+        batch = torch.tensor([], dtype=torch.int64)
         for idx in self.sampler1:
             idx1 = self.events1_idx[idx, None]
             batch = torch.cat((batch, idx1), 0)
             if batch.shape[0] == self.batch1_size:
                 yield batch
-                batch = torch.tensor([], dtype=torch.int)
+                batch = torch.tensor([], dtype=torch.int64)
         if batch.shape[0] > 0:
             yield batch
 
