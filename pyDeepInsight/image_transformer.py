@@ -13,6 +13,7 @@ from scipy.optimize import linear_sum_assignment
 from matplotlib import pyplot as plt
 import inspect
 
+from .utils import asymmetric_greedy_search
 
 class ManifoldLearner(Protocol):
     def fit_transform(self: 'ManifoldLearner',
@@ -93,8 +94,8 @@ class ImageTransformer:
                             'string nor has method "fit_transform"')
         return fe_func
 
-    @staticmethod
-    def _parse_discretization(method: str):
+    @classmethod
+    def _parse_discretization(cls, method: str):
         """Validate the discretization value passed to the
         constructor method and return correct function
 
@@ -105,15 +106,17 @@ class ImageTransformer:
             function
         """
         if method == 'bin':
-            func = ImageTransformer.coordinate_binning
-        elif method == 'assignment':
-            func = ImageTransformer.coordinate_assignment
+            func = cls.coordinate_binning
+        elif method == 'assignment' or method == 'lsa':
+            func = cls.coordinate_optimal_assignment
+        elif method == 'ags':
+            func = cls.coordinate_heuristic_assignment
         else:
             raise ValueError(f"discretization method '{method}' not valid")
         return func
 
-    @staticmethod
-    def coordinate_binning(position: np.ndarray,
+    @classmethod
+    def coordinate_binning(cls, position: np.ndarray,
                            px_size: Tuple[int, int]) -> np.ndarray:
         """Determine the pixel locations of each feature based on the overlap of
         feature position and pixel locations.
@@ -125,7 +128,7 @@ class ImageTransformer:
         Returns:
             a 2d array of feature to pixel mappings
         """
-        scaled = ImageTransformer.scale_coordinates(position, px_size)
+        scaled = cls.scale_coordinates(position, px_size)
         px_binned = np.floor(scaled).astype(int)
         # Need to move maximum values into the lower bin
         px_binned[:, 0][px_binned[:, 0] == px_size[0]] = px_size[0] - 1
@@ -133,8 +136,18 @@ class ImageTransformer:
         return px_binned
 
     @staticmethod
-    def coordinate_assignment(position: np.ndarray,
-                              px_size: Tuple[int, int]) -> np.ndarray:
+    def lsap_optimal_solution(cost_matrix):
+        return linear_sum_assignment(cost_matrix)
+
+    @staticmethod
+    def lsap_heuristic_solution(cost_matrix):
+        return asymmetric_greedy_search(cost_matrix,
+                                        shuffle=True,
+                                        minimize=True)
+
+    @classmethod
+    def coordinate_optimal_assignment(cls, position: np.ndarray,
+                                      px_size: Tuple[int, int]) -> np.ndarray:
         """Determine the pixel location of each feature using a linear sum
         assignment problem solution on the exponential on the euclidean
         distances between the features and the pixels
@@ -146,8 +159,8 @@ class ImageTransformer:
         Returns:
             a 2d array of feature to pixel mappings
         """
-        scaled = ImageTransformer.scale_coordinates(position, px_size)
-        px_centers = ImageTransformer.calculate_pixel_centroids(px_size)
+        scaled = cls.scale_coordinates(position, px_size)
+        px_centers = cls.calculate_pixel_centroids(px_size)
 
         # calculate distances
         k = np.prod(px_size)
@@ -159,10 +172,8 @@ class ImageTransformer:
             dist = cdist(cl_centers, px_centers, metric='euclidean')
         else:
             dist = cdist(scaled, px_centers, metric='euclidean')
-        # calculate exponential of the distances to prioritize short distances
-        edist = np.exp(dist)
         # assignment of features/clusters to pixels
-        lsa = linear_sum_assignment(edist)
+        lsa = cls.lsap_optimal_solution(dist)
         px_assigned = np.empty(scaled.shape, dtype=int)
         for i in range(scaled.shape[0]):
             if clustered:
@@ -171,6 +182,38 @@ class ImageTransformer:
                 # Which is mapped to the pixel center clust_cntr[j]
                 # Which is mapped to the pixel k = lsa[1][j]
                 # For pixel k, x = k % px_size[0] and y = k // px_size[0]
+                j = cl_labels[i]
+            else:
+                j = i
+            ki = lsa[1][j]
+            xi = ki % px_size[0]
+            yi = ki // px_size[0]
+            px_assigned[i] = [yi, xi]
+        return px_assigned
+
+    @classmethod
+    def coordinate_heuristic_assignment(cls, position: np.ndarray,
+                                        px_size: Tuple[int, int]) -> np.ndarray:
+
+        scaled = cls.scale_coordinates(position, px_size)
+        px_centers = cls.calculate_pixel_centroids(px_size)
+
+        # calculate distances
+        # AGS requires asymmetric assignment so k must be less than pixels
+        k = np.prod(px_size) - 1
+        clustered = scaled.shape[0] > k
+        if clustered:
+            kmeans = KMeans(n_clusters=k).fit(scaled)
+            cl_labels = kmeans.labels_
+            cl_centers = kmeans.cluster_centers_
+            dist = cdist(cl_centers, px_centers, metric='euclidean')
+        else:
+            dist = cdist(scaled, px_centers, metric='euclidean')
+        # assignment of features/clusters to pixels
+        lsa = cls.lsap_heuristic_solution(dist)
+        px_assigned = np.empty(scaled.shape, dtype=int)
+        for i in range(scaled.shape[0]):
+            if clustered:
                 j = cl_labels[i]
             else:
                 j = i
@@ -351,11 +394,11 @@ class ImageTransformer:
                 the pixel parameter
         """
         if img.ndim == 2 and img.shape == self._pixels:
-            X = img[self._coords[:,0], self._coords[:,1]]
+            X = img[self._coords[:, 0], self._coords[:, 1]]
         elif img.ndim == 3 and img.shape[-2:] == self._pixels:
             X = img[:, self._coords[:, 0], self._coords[:, 1]]
         elif img.ndim == 3 and img.shape[0:2] == self._pixels:
-            X = img[self._coords[:,0], self._coords[:,1], :]
+            X = img[self._coords[:, 0], self._coords[:, 1], :]
         elif img.ndim == 4 and img.shape[1:3] == self._pixels:
             X = img[:, self._coords[:, 0], self._coords[:, 1], :]
         else:

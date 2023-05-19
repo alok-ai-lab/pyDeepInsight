@@ -1,37 +1,10 @@
-from typing import Optional, Sequence
-import numpy as np
+from typing import Sequence
 import math
 import torch
 from torch.utils.data.sampler import Sampler, RandomSampler
 
-class Norm2Scaler:
-    """Log normalize and scale data
 
-    Log normalization and scaling procedure as described as norm-2 in the
-    DeepInsight paper supplementary information.
-    """
-
-    def __init__(self) -> None:
-        pass
-
-    def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None):
-        self._min0 = X.min(axis=0)
-        self._max = np.log(X + np.abs(self._min0) + 1).max()
-        return self
-
-    def fit_transform(self, X: np.ndarray, y: Optional[np.ndarray] = None
-                      ) -> np.ndarray:
-        self._min0 = X.min(axis=0)
-        X_norm = np.log(X + np.abs(self._min0) + 1)
-        self._max = X_norm.max()
-        return X_norm / self._max
-
-    def transform(self, X: np.ndarray, y: Optional[np.ndarray] = None
-                  ) -> np.ndarray:
-        X_norm = np.log(X + np.abs(self._min0) + 1).clip(0, None)
-        return (X_norm / self._max).clip(0, 1)
-
-class StratifiedBinaryBatchSampler(Sampler):
+class StratifiedEventBatchSampler(Sampler):
     """Samples elements with from a set with binary labelling to ensure
     the event label (1) is evenly distributed across batches.
 
@@ -58,10 +31,12 @@ class StratifiedBinaryBatchSampler(Sampler):
         self.events0_idx = torch.where(self.events == 0)[0]
         self.events1_idx = torch.where(self.events == 1)[0]
 
-        if self.events1_idx.shape[0] < self.__len__():
+        self._len = math.ceil(len(self.events) / self.batch_size)
+
+        if self.events1_idx.shape[0] < self._len:
             raise ValueError("the number of events ({}) must be equal or "
                              "larger than the number of batches ({})"
-                             .format(self.events1_idx.shape[0], self.__len__()))
+                             .format(self.events1_idx.shape[0], self._len))
 
         # Get batch sizes for each
         self.batch0_size = math.ceil(
@@ -102,6 +77,7 @@ class StratifiedBinaryBatchSampler(Sampler):
             batch = torch.cat((batch0, batch1), 0).sort()[0]
             yield batch
 
-    def __len__(self):
-        """Return the number of batches"""
-        return math.ceil(len(self.events) / self.batch_size)
+    # Removed - https://github.com/Lightning-AI/lightning/issues/2429
+    # def __len__(self):
+    #     """Return the number of batches"""
+    #     return self._len
