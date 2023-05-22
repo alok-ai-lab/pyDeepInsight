@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 install_requires = [
     'numpy',
@@ -14,7 +14,7 @@ install_requires = [
 setup(
     name='pyDeepInsight',
     version='0.1.1',
-    packages=['pyDeepInsight'],
+    packages=find_packages(),
     url='https://github.com/alok-ai-lab/pyDeepInsight',
     license='GPLv3',
     author='Keith A. Boroevich',
