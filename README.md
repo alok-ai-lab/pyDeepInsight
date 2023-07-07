@@ -124,3 +124,18 @@ Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https
 [tcam]: https://github.com/frgfm/torch-cam
 [tgcam]: https://github.com/jacobgil/pytorch-grad-cam
 [disi]: https://static-content.springer.com/esm/art%3A10.1038%2Fs41598-019-47765-6/MediaObjects/41598_2019_47765_MOESM1_ESM.pdf
+
+# Citation
+```
+@ARTICLE{Sharma2019-rs,
+  title     = "{DeepInsight}: A methodology to transform a non-image data to an
+               image for convolution neural network architecture",
+  author    = "Sharma, Alok and Vans, Edwin and Shigemizu, Daichi and
+               Boroevich, Keith A and Tsunoda, Tatsuhiko",
+  journal   = "Sci. Rep.",
+  volume    =  9,
+  number    =  1,
+  pages     = "11399",
+  year      =  2019,
+}
+```
