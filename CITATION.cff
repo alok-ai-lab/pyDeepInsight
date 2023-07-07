@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - given-names: Alok
+    family-names: Sharma
+    orcid: 'https://orcid.org/0000-0002-7668-3501'
+  - given-names: Artem
+    family-names: Lysenko
+    orcid: 'https://orcid.org/0000-0002-1441-0604'
+  - given-names: Keith Anthony
+    family-names: Boroevich
+    orcid: 'https://orcid.org/0000-0001-7095-7332'
+  - family-names: Tsunoda
+    given-names: Tatsuhiko
+    orcid: 'https://orcid.org/0000-0002-5439-7918'
+title: pyDeepInsight
+doi: 10.1038/s41598-019-47765-6
+url: 'https://github.com/alok-ai-lab/pyDeepInsight'
