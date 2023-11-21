@@ -188,8 +188,8 @@ class CAMFeatureSelector:
         for cat, cam in cams.items():
             cam_pass = np.stack(np.where(cam >= threshold)).T
             it_pass = np.where(
-                (self.feature_coords == cam_pass[:, None]).all(-1).any(-1)
-            )[0]
+                (self.feature_coords == cam_pass[:, None]).all(-1)
+            )[1]
             class_idx[cat] = it_pass
         return class_idx
 
