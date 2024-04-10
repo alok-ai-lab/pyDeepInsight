@@ -1,4 +1,3 @@
-from typing import Sequence
 import math
 import torch
 from torch.utils.data.sampler import Sampler, RandomSampler
@@ -14,14 +13,22 @@ class StratifiedEventBatchSampler(Sampler):
 
     events: torch.Tensor
     batch_size: int
+    events0_idx: torch.Tensor
+    events1_idx: torch.Tensor
+    _len: int
+    batch0_size: int
+    batch1_size: int
+    sampler0: Sampler
+    sampler1: Sampler
 
-    def __init__(self, events: Sequence[int], batch_size: int) -> None:
+    def __init__(self, events, batch_size):
         """Generate an StratifiedBinaryBatchSampler instance
 
         Args:
             events: int sequence of binary event labels (0, 1)
             batch_size: int that defines size of mini-batch.
         """
+        super().__init__()
         if not isinstance(batch_size, int) or batch_size <= 0:
             raise ValueError("batch_size should be a positive integer value, "
                              "but got batch_size={}".format(batch_size))

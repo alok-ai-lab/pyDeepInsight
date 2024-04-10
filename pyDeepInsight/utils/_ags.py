@@ -9,7 +9,7 @@ DOI:10.1007/s10878-015-9979-2
 """
 
 
-def _initial(benefit_matrix, shuffle: bool = False):
+def _initial(benefit_matrix, shuffle=False):
     """Initialize the assignment solution array. Sequentially assign each
     row to an unassigned column with the maximum benefit
 
@@ -205,11 +205,11 @@ def asymmetric_greedy_search(benefit_matrix, shuffle=False, minimize=False):
     while brb_max > 0 or bcb_max > 0:
         while brb_max > 0 or bcb_max > 0:
             if brb_max > bcb_max:
-                r = np.argmax(brb)
+                r = int(np.argmax(brb))
                 assignment, brs, brb, bcs, bcb = \
                     _row_swap(bm, assignment, brs, brb, bcs, bcb, r)
             else:
-                r = np.argmax(bcb)
+                r = int(np.argmax(bcb))
                 assignment, brs, brb, bcs, bcb = \
                     _col_swap(bm, assignment, brs, brb, bcs, bcb, r)
             brb_max = np.amax(brb)
