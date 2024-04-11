@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import TSNE
 from sklearn.cluster import MiniBatchKMeans
@@ -266,8 +265,7 @@ class ImageTransformer:
         self._calculate_coords()
         # plot rotation diagram if requested
         if plot is True:
-            plt.scatter(x_new[:, 0], x_new[:, 1], s=1,
-                        cmap=matplotlib.cm.get_cmap("jet", 10), alpha=0.2)
+            plt.scatter(x_new[:, 0], x_new[:, 1], s=1, alpha=0.2)
             plt.fill(x_new[chvertices, 0], x_new[chvertices, 1],
                      edgecolor='r', fill=False)
             plt.fill(mbr[:, 0], mbr[:, 1], edgecolor='g', fill=False)
@@ -343,30 +341,21 @@ class ImageTransformer:
             A list of n_samples numpy matrices of dimensions set by
             the pixel parameter
         """
-        img_coords = pd.DataFrame(np.vstack((
-            self._coords.T,
-            X
-        )).T).groupby([0, 1], as_index=False).mean()
-
-        img_list = []
-        blank_mat = np.zeros(self._pixels)
+        unq, idx, cnt = np.unique(self._coords, return_inverse=True,
+                                  return_counts=True, axis=0)
+        img_matrix = np.zeros((X.shape[0],) + self._pixels)
         if empty_value != 0:
-            blank_mat[:] = empty_value
-        for z in range(2, img_coords.shape[1]):
-            img_matrix = blank_mat.copy()
-            img_matrix[img_coords[0].astype(int),
-                       img_coords[1].astype(int)] = img_coords[z]
-            img_list.append(img_matrix)
+            img_matrix[:] = empty_value
+        for i, c in enumerate(unq):
+            img_matrix[:, *c] = X[:, np.where(idx == i)[0]].mean(axis=1)
 
-        # img_matrices = np.empty(0) ---- REMOVE?
         if img_format == 'rgb':
-            img_matrices = np.array([self._mat_to_rgb(m) for m in img_list])
+            img_matrix = self._mat_to_rgb(img_matrix)
         elif img_format == 'scalar':
-            img_matrices = np.stack(img_list)
+            pass
         else:
             raise ValueError(f"'{img_format}' not accepted for img_format")
-
-        return img_matrices
+        return img_matrix
 
     def fit_transform(self, X, **kwargs):
         """Train the image transformer from the training set (X) and return
@@ -483,10 +472,11 @@ class ImageTransformer:
         """Convert image matrix to numpy rgb format
 
         Args:
-            mat: {array-like} (M, N)
+            mat: {array-like} (..., M, N)
 
         Returns:
-            An numpy.ndarray (M, N, 3) with original values repeated across
-            RGB channels.
+            An numpy.ndarray (..., M, N, 3) with original values repeated
+            across RGB channels.
         """
-        return np.repeat(mat[:, :, np.newaxis], 3, axis=2)
+
+        return np.repeat(mat[..., np.newaxis], 3, axis=-1)

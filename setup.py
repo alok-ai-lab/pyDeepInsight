@@ -4,7 +4,6 @@ install_requires = [
     'numpy',
     'scipy',
     'scikit-learn>=0.22',
-    'pandas',
     'matplotlib',
     'torch',
     'grad_cam',
