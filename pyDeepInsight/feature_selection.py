@@ -63,14 +63,13 @@ class CAMFeatureSelector:
 
         return resolved_target
 
-    def compute_cam(self, X, y, batch_size=1, use_cuda=False):
+    def compute_cam(self, X, y, batch_size=1):
         """Compute class activation map (CAM) for each image in X of classes y.
 
         Args:
             X: Tensor of input images
             y: Tensor of input labels
             batch_size: Batch size (default 1)
-            use_cuda: Whether to use cuda for calculating CAMs
         Return:
             A numpy array of CAMs
         """
@@ -83,8 +82,7 @@ class CAMFeatureSelector:
         for i, data in enumerate(dl):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            cam = func(model=self.model, target_layers=[self.target_layer],
-                       use_cuda=use_cuda)
+            cam = func(model=self.model, target_layers=[self.target_layer])
             targets = [ClassifierOutputTarget(label) for label in labels]
             grayscale_cam = cam(input_tensor=inputs, targets=targets)
             activations = np.append(activations, grayscale_cam, axis=0)
@@ -148,9 +146,7 @@ class CAMFeatureSelector:
         Returns:
             A dictionary with classes as keys and the flattened CAM as values
         """
-        use_cuda = X.is_cuda
-        activations = self.compute_cam(X=X, y=y, batch_size=batch_size,
-                                       use_cuda=use_cuda)
+        activations = self.compute_cam(X=X, y=y, batch_size=batch_size)
         y_cpu = y.detach().cpu().numpy()
         cat_cam = self.flatten_classes(y_cpu, activations,
                                        method=flatten_method)
