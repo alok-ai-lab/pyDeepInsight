@@ -1,23 +1,16 @@
-from typing import Union, Any, Optional, Tuple
-from typing_extensions import Protocol
-from numpy.typing import ArrayLike
-
 import numpy as np
-import pandas as pd
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import TSNE
-from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
-from matplotlib import pyplot as plt
+import matplotlib
+import matplotlib.pyplot as plt
 import inspect
+import warnings
 
 from .utils import asymmetric_greedy_search
-
-class ManifoldLearner(Protocol):
-    def fit_transform(self: 'ManifoldLearner',
-                      X: np.ndarray) -> np.ndarray: pass
 
 
 class ImageTransformer:
@@ -28,9 +21,8 @@ class ImageTransformer:
 
     """
 
-    def __init__(self, feature_extractor: Union[str, ManifoldLearner] = 'tsne',
-                 discretization: str = 'bin',
-                 pixels: Union[int, Tuple[int, int]] = (224, 224)) -> None:
+    def __init__(self, feature_extractor='tsne', discretization='bin',
+                 pixels=(224, 224)):
         """Generate an ImageTransformer instance
 
         Args:
@@ -50,7 +42,7 @@ class ImageTransformer:
         self._coords = np.empty(0)
 
     @staticmethod
-    def _parse_pixels(pixels: Union[int, Tuple[int, int]]) -> Tuple[int, int]:
+    def _parse_pixels(pixels):
         """Check and correct pixel parameter
 
         Args:
@@ -62,8 +54,7 @@ class ImageTransformer:
         return pixels
 
     @staticmethod
-    def _parse_feature_extractor(
-            feature_extractor: Union[str, ManifoldLearner]) -> ManifoldLearner:
+    def _parse_feature_extractor(feature_extractor):
         """Validate the feature extractor value passed to the
         constructor method and return correct method
 
@@ -76,6 +67,9 @@ class ImageTransformer:
             function
         """
         if isinstance(feature_extractor, str):
+            warnings.warn("Defining feature_extractor as a string of 'tsne'," +
+                          " 'pca', or 'kpca' is depreciated. Please provide " +
+                          " a class instance", DeprecationWarning)
             fe = feature_extractor.casefold()
             if fe == 'tsne'.casefold():
                 fe_func = TSNE(n_components=2, metric='cosine')
@@ -95,7 +89,7 @@ class ImageTransformer:
         return fe_func
 
     @classmethod
-    def _parse_discretization(cls, method: str):
+    def _parse_discretization(cls, method):
         """Validate the discretization value passed to the
         constructor method and return correct function
 
@@ -116,8 +110,7 @@ class ImageTransformer:
         return func
 
     @classmethod
-    def coordinate_binning(cls, position: np.ndarray,
-                           px_size: Tuple[int, int]) -> np.ndarray:
+    def coordinate_binning(cls, position, px_size):
         """Determine the pixel locations of each feature based on the overlap of
         feature position and pixel locations.
 
@@ -146,11 +139,10 @@ class ImageTransformer:
                                         minimize=True)
 
     @classmethod
-    def coordinate_optimal_assignment(cls, position: np.ndarray,
-                                      px_size: Tuple[int, int]) -> np.ndarray:
+    def coordinate_optimal_assignment(cls, position, px_size):
         """Determine the pixel location of each feature using a linear sum
-        assignment problem solution on the exponential on the euclidean
-        distances between the features and the pixels
+        assignment problem solution on the Euclidean distances between the
+        features and the pixels centers'
 
         Args:
             position: a 2d array of feature coordinates
@@ -161,30 +153,24 @@ class ImageTransformer:
         """
         scaled = cls.scale_coordinates(position, px_size)
         px_centers = cls.calculate_pixel_centroids(px_size)
-
         # calculate distances
         k = np.prod(px_size)
         clustered = scaled.shape[0] > k
         if clustered:
-            kmeans = KMeans(n_clusters=k).fit(scaled)
-            cl_labels = kmeans.labels_
-            cl_centers = kmeans.cluster_centers_
-            dist = cdist(cl_centers, px_centers, metric='euclidean')
+            dist, labels = cls.clustered_cdist(scaled, px_centers, k)
         else:
             dist = cdist(scaled, px_centers, metric='euclidean')
+            labels = np.arange(scaled.shape[0])
         # assignment of features/clusters to pixels
         lsa = cls.lsap_optimal_solution(dist)
         px_assigned = np.empty(scaled.shape, dtype=int)
         for i in range(scaled.shape[0]):
-            if clustered:
-                # The feature at i
-                # Is mapped to the cluster j=clabl[i]
-                # Which is mapped to the pixel center clust_cntr[j]
-                # Which is mapped to the pixel k = lsa[1][j]
-                # For pixel k, x = k % px_size[0] and y = k // px_size[0]
-                j = cl_labels[i]
-            else:
-                j = i
+            # The feature at i
+            # Is mapped to the cluster j=clabl[i]
+            # Which is mapped to the pixel center clust_cntr[j]
+            # Which is mapped to the pixel k = lsa[1][j]
+            # For pixel k, x = k % px_size[0] and y = k // px_size[0]
+            j = labels[i]
             ki = lsa[1][j]
             xi = ki % px_size[0]
             yi = ki // px_size[0]
@@ -192,31 +178,33 @@ class ImageTransformer:
         return px_assigned
 
     @classmethod
-    def coordinate_heuristic_assignment(cls, position: np.ndarray,
-                                        px_size: Tuple[int, int]) -> np.ndarray:
+    def coordinate_heuristic_assignment(cls, position, px_size):
+        """Determine the pixel location of each feature using a heuristic linear
+        assignment problem solution on the Euclidean distances between the
+        features and the pixels' centers
 
+        Args:
+            position: a 2d array of feature coordinates
+            px_size: tuple with image dimensions
+
+        Returns:
+            a 2d array of feature to pixel mappings
+        """
         scaled = cls.scale_coordinates(position, px_size)
         px_centers = cls.calculate_pixel_centroids(px_size)
-
-        # calculate distances
         # AGS requires asymmetric assignment so k must be less than pixels
         k = np.prod(px_size) - 1
         clustered = scaled.shape[0] > k
         if clustered:
-            kmeans = KMeans(n_clusters=k).fit(scaled)
-            cl_labels = kmeans.labels_
-            cl_centers = kmeans.cluster_centers_
-            dist = cdist(cl_centers, px_centers, metric='euclidean')
+            dist, labels = cls.clustered_cdist(scaled, px_centers, k)
         else:
             dist = cdist(scaled, px_centers, metric='euclidean')
+            labels = np.arange(scaled.shape[0])
         # assignment of features/clusters to pixels
         lsa = cls.lsap_heuristic_solution(dist)
         px_assigned = np.empty(scaled.shape, dtype=int)
         for i in range(scaled.shape[0]):
-            if clustered:
-                j = cl_labels[i]
-            else:
-                j = i
+            j = labels[i]
             ki = lsa[1][j]
             xi = ki % px_size[0]
             yi = ki // px_size[0]
@@ -224,7 +212,7 @@ class ImageTransformer:
         return px_assigned
 
     @staticmethod
-    def calculate_pixel_centroids(px_size: Tuple[int, int]) -> np.ndarray:
+    def calculate_pixel_centroids(px_size):
         """Generate a 2d array of the centroid of each pixel
 
         Args:
@@ -240,8 +228,18 @@ class ImageTransformer:
         px_centroid = px_map + 0.5
         return px_centroid
 
-    def fit(self, X: np.ndarray, y: Optional[ArrayLike] = None,
-            plot: bool = False):
+    @staticmethod
+    def clustered_cdist(positions, centroids, k):
+        """
+
+        """
+        kmeans = MiniBatchKMeans(n_clusters=k).fit(positions)
+        cl_labels = kmeans.labels_
+        cl_centers = kmeans.cluster_centers_
+        dist = cdist(cl_centers, centroids, metric='euclidean')
+        return dist, cl_labels
+
+    def fit(self, X, y=None, plot=False):
         """Train the image transformer from the training set (X)
 
         Args:
@@ -267,8 +265,7 @@ class ImageTransformer:
         self._calculate_coords()
         # plot rotation diagram if requested
         if plot is True:
-            plt.scatter(x_new[:, 0], x_new[:, 1], s=1,
-                        cmap=plt.cm.get_cmap("jet", 10), alpha=0.2)
+            plt.scatter(x_new[:, 0], x_new[:, 1], s=1, alpha=0.2)
             plt.fill(x_new[chvertices, 0], x_new[chvertices, 1],
                      edgecolor='r', fill=False)
             plt.fill(mbr[:, 0], mbr[:, 1], edgecolor='g', fill=False)
@@ -277,7 +274,7 @@ class ImageTransformer:
         return self
 
     @property
-    def pixels(self) -> Tuple[int, int]:
+    def pixels(self):
         """The image matrix dimensions
 
         Returns:
@@ -287,7 +284,7 @@ class ImageTransformer:
         return self._pixels
 
     @pixels.setter
-    def pixels(self, pixels: Union[int, Tuple[int, int]]) -> None:
+    def pixels(self, pixels):
         """Set the image matrix dimension
 
         Args:
@@ -303,7 +300,7 @@ class ImageTransformer:
             self._calculate_coords()
 
     @staticmethod
-    def scale_coordinates(coords: np.ndarray, dim_max: ArrayLike) -> np.ndarray:
+    def scale_coordinates(coords, dim_max):
         """Transforms a list of n-dimensional coordinates by scaling them
         between zero and the given dimensional maximum
 
@@ -320,7 +317,7 @@ class ImageTransformer:
         scaled = np.multiply(std, dim_max)
         return scaled
 
-    def _calculate_coords(self) -> None:
+    def _calculate_coords(self):
         """Calculate the matrix coordinates of each feature based on the
         pixel dimensions.
         """
@@ -328,8 +325,7 @@ class ImageTransformer:
         px_coords = self._dm(scaled, self._pixels)
         self._coords = px_coords
 
-    def transform(self, X: np.ndarray, img_format: str = 'rgb',
-                  empty_value: int = 0) -> np.ndarray:
+    def transform(self, X, img_format='rgb', empty_value=0):
         """Transform the input matrix into image matrices
 
         Args:
@@ -345,32 +341,23 @@ class ImageTransformer:
             A list of n_samples numpy matrices of dimensions set by
             the pixel parameter
         """
-        img_coords = pd.DataFrame(np.vstack((
-            self._coords.T,
-            X
-        )).T).groupby([0, 1], as_index=False).mean()
-
-        img_list = []
-        blank_mat = np.zeros(self._pixels)
+        unq, idx, cnt = np.unique(self._coords, return_inverse=True,
+                                  return_counts=True, axis=0)
+        img_matrix = np.zeros((X.shape[0],) + self._pixels)
         if empty_value != 0:
-            blank_mat[:] = empty_value
-        for z in range(2, img_coords.shape[1]):
-            img_matrix = blank_mat.copy()
-            img_matrix[img_coords[0].astype(int),
-                       img_coords[1].astype(int)] = img_coords[z]
-            img_list.append(img_matrix)
+            img_matrix[:] = empty_value
+        for i, c in enumerate(unq):
+            img_matrix[:, *c] = X[:, np.where(idx == i)[0]].mean(axis=1)
 
-        # img_matrices = np.empty(0) ---- REMOVE?
         if img_format == 'rgb':
-            img_matrices = np.array([self._mat_to_rgb(m) for m in img_list])
+            img_matrix = self._mat_to_rgb(img_matrix)
         elif img_format == 'scalar':
-            img_matrices = np.stack(img_list)
+            pass
         else:
             raise ValueError(f"'{img_format}' not accepted for img_format")
+        return img_matrix
 
-        return img_matrices
-
-    def fit_transform(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
+    def fit_transform(self, X, **kwargs):
         """Train the image transformer from the training set (X) and return
         the transformed data.
 
@@ -384,7 +371,7 @@ class ImageTransformer:
         self.fit(X)
         return self.transform(X, **kwargs)
 
-    def inverse_transform(self, img: np.ndarray) -> np.ndarray:
+    def inverse_transform(self, img):
         """Transform an image layer back to its original space.
             Args:
                 img:
@@ -407,7 +394,7 @@ class ImageTransformer:
                               f"optional, but got {img.shape}"))
         return X
 
-    def feature_density_matrix(self) -> np.ndarray:
+    def feature_density_matrix(self):
         """Generate image matrix with feature counts per pixel
 
         Returns:
@@ -417,7 +404,7 @@ class ImageTransformer:
         np.add.at(fdmat, tuple(self._coords.T), 1)
         return fdmat
 
-    def coords(self) -> np.ndarray:
+    def coords(self):
         """Get feature coordinates
 
         Returns:
@@ -426,15 +413,14 @@ class ImageTransformer:
         return self._coords.copy()
 
     @staticmethod
-    def _minimum_bounding_rectangle(hull_points: np.ndarray
-                                    ) -> Tuple[np.ndarray, np.ndarray]:
+    def _minimum_bounding_rectangle(hull_points):
         """Find the smallest bounding rectangle for a set of points.
 
         Modified from JesseBuesking at https://stackoverflow.com/a/33619018
         Returns a set of points representing the corners of the bounding box.
 
         Args:
-            hull_points : an nx2 matrix of hull coordinates
+            hull_points : nx2 matrix of hull coordinates
 
         Returns:
             (tuple): tuple containing
@@ -482,14 +468,15 @@ class ImageTransformer:
         return coords, rotmat
 
     @staticmethod
-    def _mat_to_rgb(mat: np.ndarray) -> np.ndarray:
+    def _mat_to_rgb(mat):
         """Convert image matrix to numpy rgb format
 
         Args:
-            mat: {array-like} (M, N)
+            mat: {array-like} (..., M, N)
 
         Returns:
-            An numpy.ndarray (M, N, 3) with original values repeated across
-            RGB channels.
+            An numpy.ndarray (..., M, N, 3) with original values repeated
+            across RGB channels.
         """
-        return np.repeat(mat[:, :, np.newaxis], 3, axis=2)
+
+        return np.repeat(mat[..., np.newaxis], 3, axis=-1)

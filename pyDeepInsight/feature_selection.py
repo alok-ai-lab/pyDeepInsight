@@ -1,8 +1,5 @@
-from typing import Union, Optional, Dict
-from .image_transformer import ImageTransformer
-
 import numpy as np
-from torch import nn, Tensor
+from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 
 import pytorch_grad_cam
@@ -14,14 +11,11 @@ class CAMFeatureSelector:
     """Extract important features from a model using class activation mapping
     (CAM).
 
-    This class takes a trained model and it's training data to identify
+    This class takes a trained model and its training data to identify
     important features to prediction of each class.
     """
 
-    def __init__(self, model: nn.Module,
-                 it: ImageTransformer,
-                 target_layer: Union[str, nn.Module] = None,
-                 cam_method: str = "GradCAM") -> None:
+    def __init__(self, model, it, target_layer=None, cam_method="GradCAM"):
         """Generate a CAMFeatureSelector instance
 
         Args:
@@ -44,9 +38,7 @@ class CAMFeatureSelector:
         self.model = model
         self.target_layer = self._resolve_target_layer(target_layer)
 
-    def _resolve_target_layer(self,
-                              target_layer: Union[str, nn.Module] = None
-                              ) -> Optional[nn.Module]:
+    def _resolve_target_layer(self, target_layer=None):
         """Convert layer name to layer or identify candidate layer if none
         given.
 
@@ -71,16 +63,13 @@ class CAMFeatureSelector:
 
         return resolved_target
 
-    def compute_cam(self, X: Tensor, y: Tensor,
-                    batch_size: int = 1, use_cuda: bool = False,
-                    ) -> np.ndarray:
+    def compute_cam(self, X, y, batch_size=1):
         """Compute class activation map (CAM) for each image in X of classes y.
 
         Args:
             X: Tensor of input images
             y: Tensor of input labels
             batch_size: Batch size (default 1)
-            use_cuda: Whether to use cuda for calculating CAMs
         Return:
             A numpy array of CAMs
         """
@@ -93,8 +82,7 @@ class CAMFeatureSelector:
         for i, data in enumerate(dl):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            cam = func(model=self.model, target_layers=[self.target_layer],
-                       use_cuda=use_cuda)
+            cam = func(model=self.model, target_layers=[self.target_layer])
             targets = [ClassifierOutputTarget(label) for label in labels]
             grayscale_cam = cam(input_tensor=inputs, targets=targets)
             activations = np.append(activations, grayscale_cam, axis=0)
@@ -102,8 +90,7 @@ class CAMFeatureSelector:
         return activations
 
     @staticmethod
-    def flatten_cam(cams: np.ndarray,
-                    method: str = "mean") -> np.ndarray:
+    def flatten_cam(cams, method="mean"):
         """Flatten multiple CAMs into a single CAM.
 
         Args:
@@ -125,8 +112,7 @@ class CAMFeatureSelector:
         return flat_cam
 
     @staticmethod
-    def flatten_classes(labels: np.ndarray, cam: np.ndarray,
-                        method: str = "mean") -> Dict[int, np.ndarray]:
+    def flatten_classes(labels, cam, method="mean"):
         """Flatten CAMs across all classes
 
         Args:
@@ -146,9 +132,8 @@ class CAMFeatureSelector:
             cat_cam[cat] = flat_act
         return cat_cam
 
-    def calculate_class_activations(self, X: Tensor, y: Tensor,
-                                    batch_size: int = 1, flatten_method="mean"
-                                    ) -> Dict[int, np.ndarray]:
+    def calculate_class_activations(self, X, y, batch_size=1,
+                                    flatten_method="mean"):
         """Calculate CAM for each input then flatten for each class.
 
         Args:
@@ -161,17 +146,14 @@ class CAMFeatureSelector:
         Returns:
             A dictionary with classes as keys and the flattened CAM as values
         """
-        use_cuda = X.is_cuda
-        activations = self.compute_cam(X=X, y=y, batch_size=batch_size,
-                                       use_cuda=use_cuda)
+        activations = self.compute_cam(X=X, y=y, batch_size=batch_size)
         y_cpu = y.detach().cpu().numpy()
         cat_cam = self.flatten_classes(y_cpu, activations,
                                        method=flatten_method)
 
         return cat_cam
 
-    def select_class_features(self, cams: Dict[int, np.ndarray],
-                              threshold: float = 0.6) -> Dict[int, np.ndarray]:
+    def select_class_features(self, cams, threshold=0.6):
         """Select features for each class using class-specific CAMs. Input
         feature coordinates are filtered based on activation at same
         coordinates.
