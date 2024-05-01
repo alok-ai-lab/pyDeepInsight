@@ -14,6 +14,47 @@ experimental.
 
 ## Overview
 
+DeepInsight is a methodology to transform non-image data into image format 
+suitable for analysis by image-based machine learning, such as convolutional
+neural networks (CNNs). pyDeepInsight provides access to these methodologies
+via classes.
+
+### Image Transformation
+
+DeepInsight maps high-dimensional biological data onto a two-dimensional grid, 
+facilitating the identification of patterns and relationships within the data. 
+through machine learning. The transformation can be done using any feature 
+reduction algorithm. Commonly used manifolds include:
+
+**PCA**
+
+![image](docs/images/manifold_pca.png) 
+<sub>Left: First two PCs, with the convex hull in red and the minimum bounding 
+box in green. Middle: Density matrix for the number of features mapped to a
+given pixel. Right: Generated images for a selection of samples.</sub>
+
+**t-SNE**
+
+![image](docs/images/manifold_tsne.png)
+<sub>Left: t-SNE embedding vectors, with the convex hull in red and the minimum bounding 
+box in green. Middle: Density matrix for the number of features mapped to a
+given pixel. Right: Generated images for a selection of samples.</sub>
+
+**UMAP**
+
+![image](docs/images/manifold_umap.png)
+<sub>Left: UMAP embedding, with the convex hull in red and the minimum bounding 
+box in green. Middle: Density matrix for the number of features mapped to a
+given pixel. Right: Generated images for a selection of samples.</sub>
+
+To reduce feature-to-pixel mapping collisions, alternative discretization methods are
+available, such as the linear sum assignment algorithm.
+
+![image](docs/images/discretization_lsa.png)
+
+
+## Classes
+
 The pyDeepInsight package provides classes that aid in the transformation of 
 non-image data into image matrices that can be used to train a CNN. 
 
@@ -21,7 +62,7 @@ non-image data into image matrices that can be used to train a CNN.
 ### ImageTransformer Class
 
 Transforms features to an image matrix using dimensionality reduction and 
-discritization.
+discretization.
 
 ```python
 class pyDeepInsight.ImageTransformer(feature_extractor='tsne', 
@@ -30,25 +71,31 @@ discretization='bin', pixels=(224, 224))
 
 #### Parameters
 
-* **feature_extractor**: string of value ('*tsne*', '*pca*', '*kpca*') or a class 
-instance with method 'fit_transform' that returns a 2-dimensional 
-array of extracted features. The string values use the same parameters as those 
+* **feature_extractor: *{'tsne', 'pca', 'kpca') or a class 
+instance with method 'fit_transform'***    
+The string values use the same parameters as those 
 described in the [original paper][di]. Providing a class instance is preferred and 
 allows for greater customization of the feature extractor, such as modifying 
 perplexity in t-SNE, or use of alternative feature extractors, such as [UMAP][umap].
-* **discretization**: string of values ('*bin*', '*assignment*'). Defines the 
+* **discretization: *{'bin', 'lsa', 'ags'}, default='bin'***.    
+Defines the
 method for discretizing dimensionally reduced data to pixel coordinates.  
-The default '*bin*' is the method implemented in the [original paper][di] and 
+By default, 'bin', is the method implemented in the [original paper][di] and 
 maps features to pixels based on a direct scaling of the extracted features to 
-the pixel space.  
-The '*assignment*' values applies SciPy's [solution to the linear sum 
-assignment problem][lsa] to the exponent of the euclidean distance between the 
+the pixel space.     
+The 'lsa' method applies SciPy's [solution to the linear sum 
+assignment problem][lsa] to the exponent of the Euclidean distance between the 
 extracted features and pixels to assign a features to pixels with no overlap. 
-In cases where the number of features exceeds the number of pixels, the 
-features are clustered using K-means clustering, with *k* equal to the number 
-of pixels, and those clusters are assigned to pixels.
-* **pixels**: int (square matrix) or tuple of ints (height, width) that defines 
-the size of the image matrix. A default of 224 × 224 is used as that is the 
+In cases where the number of features exceeds the number of pixels, Bisecting K-Means 
+clustering is applied to the feature prior to discretization, with *k* equal to the 
+number of pixels.    
+In cases where 'lsa' takes too long or does not complete, an alternative heuristic
+name the [Asymmetric Greedy Search][ags] can be applied with the 'ags' option. 
+In cases where the number of features exceeds the number of pixels, Bisecting K-Means 
+clustering is applied to the feature prior to discretization, with *k* equal to one less 
+than the number of pixels.
+* **pixels: *int or tuple of ints, default=(224, 224)***    
+The size of the image matrix. A default of 224 × 224 is used as that is the 
 common minimum size expected by [torchvision][tv] and [timm][timm] pre-trained models.
 
 #### Methods
@@ -73,7 +120,7 @@ class DeepInsight.CAMFeatureSelector(model, it, target_layer, cam_method="GradCA
 #### Parameters
 * **model**: a [pytorch.nn.Module][pytm] CNN model trained on the output from an
 ImageTransformer instance. The [torchvision.models][tv] subpackage provides many 
-common CNN architechtures. 
+common CNN architectures. 
 * **it**: the [ImageTransformer](#imagetransformer) instance used to generate
 the images used to train the **model**.
 * **target_layer**: the target layer of the **model** on which the CAM is computed.
@@ -101,10 +148,14 @@ coordinates.
 ## References
 
 <a id="1">\[1\]</a>
-Sharma A, Vans E, Shigemizu D, Boroevich KA, & Tsunoda T. DeepInsight: A methodology to transform a non-image data to an image for convolution neural network architecture. *Sci Rep* **9**, 11399 (2019). https://doi.org/10.1038/s41598-019-47765-6
+Sharma A, Vans E, Shigemizu D, Boroevich KA, & Tsunoda T. DeepInsight: A methodology to transform a non-image data to an
+image for convolution neural network architecture. *Sci Rep* **9**, 11399 (2019). 
+https://doi.org/10.1038/s41598-019-47765-6
 
 <a id="2">\[2\]</a>
-Sharma A, Lysenko A, Boroevich KA, Vans E, & Tsunoda T. DeepFeature: feature selection in nonimage data using convolutional neural network, *Briefings in Bioinformatics*, Volume 22, Issue 6, November 2021, bbab297. https://doi.org/10.1093/bib/bbab297
+Sharma A, Lysenko A, Boroevich KA, Vans E, & Tsunoda T. DeepFeature: feature selection in nonimage data using 
+convolutional neural network, *Briefings in Bioinformatics*, Volume 22, Issue 6, November 2021, bbab297. 
+https://doi.org/10.1093/bib/bbab297
 
 <a id="3">\[3\]</a>
 François-Guillaume Fernandez. (2020). TorchCAM: class activation explorer. https://github.com/frgfm/torch-cam
@@ -115,6 +166,7 @@ Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https
 [di]: https://doi.org/10.1038/s41598-019-47765-6
 [umap]: https://umap-learn.readthedocs.io/en/latest/
 [lsa]: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html
+[ags]: https://doi.org/10.1007/s10878-015-9979-2
 [tv]: https://pytorch.org/vision/stable/models.html
 [timm]: https://github.com/rwightman/pytorch-image-models
 [df]: https://doi.org/10.1093/bib/bbab297
