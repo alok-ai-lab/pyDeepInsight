@@ -1,5 +1,4 @@
 # pyDeepInsight
-
 This package provides a python implementation of 
 [alok-ai-lab/DeepInsight](https://github.com/alok-ai-lab/DeepInsight) as originally 
 described in [*DeepInsight: A methodology to transform a non-image data to an 
@@ -7,60 +6,70 @@ image for convolution neural network architecture*][di] [\[1\]](#1). This is not
 give the same results as the published MatLab code and should be considered 
 experimental.
 
-
-
 ## Installation
     python3 -m pip -q install git+https://github.com/alok-ai-lab/pyDeepInsight.git#egg=pyDeepInsight
 
 ## Overview
-
 DeepInsight is a methodology to transform non-image data into image format 
 suitable for analysis by image-based machine learning, such as convolutional
 neural networks (CNNs). pyDeepInsight provides access to these methodologies
 via classes.
 
 ### Image Transformation
-
 DeepInsight maps high-dimensional biological data onto a two-dimensional grid, 
-facilitating the identification of patterns and relationships within the data. 
-through machine learning. The transformation can be done using any feature 
-reduction algorithm. Commonly used manifolds include:
+facilitating the identification of patterns and relationships within the data, 
+through machine learning.
 
-**PCA**
+#### Feature Topology
+Feature transformation can be done using any feature reduction algorithm that 
+provides 2D output. Commonly used methods include the following. The these example 
+data are 172 randomly selected genes from [TCGA RNA-seq][tcga] processed into a 
+12x12 pixel image.
+
+##### PCA
+[sklearn.decomposition.PCA][pca]
 
 ![image](docs/images/manifold_pca.png) 
-<sub>Left: First two PCs, with the convex hull in red and the minimum bounding 
-box in green. Middle: Density matrix for the number of features mapped to a
-given pixel. Right: Generated images for a selection of samples.</sub>
+<sub>**Left**: First two PCs, with the convex hull in red and the minimum bounding 
+box in green. **Middle**: Density matrix for the number of features mapped to a
+given pixel. **Right**: Generated images for a selection of samples.</sub>
 
-**t-SNE**
+##### t-SNE
+[sklearn.manifold.TSNE][tsne]
 
 ![image](docs/images/manifold_tsne.png)
-<sub>Left: t-SNE embedding vectors, with the convex hull in red and the minimum bounding 
-box in green. Middle: Density matrix for the number of features mapped to a
-given pixel. Right: Generated images for a selection of samples.</sub>
+<sub>**Left**: t-SNE embedding vectors, with the convex hull in red and the minimum bounding 
+box in green. **Middle**: Density matrix for the number of features mapped to a
+given pixel. **Right**: Generated images for a selection of samples.</sub>
 
-**UMAP**
+##### UMAP
+[umap.UMAP][umap]
 
 ![image](docs/images/manifold_umap.png)
-<sub>Left: UMAP embedding, with the convex hull in red and the minimum bounding 
-box in green. Middle: Density matrix for the number of features mapped to a
-given pixel. Right: Generated images for a selection of samples.</sub>
+<sub>**Left**: UMAP embedding, with the convex hull in red and the minimum bounding 
+box in green. **Middle**: Density matrix for the number of features mapped to a
+given pixel. **Right**: Generated images for a selection of samples.</sub>
 
+#### Pixel Mapping
 To reduce feature-to-pixel mapping collisions, alternative discretization methods are
 available, such as the linear sum assignment algorithm.
 
 ![image](docs/images/discretization_lsa.png)
+<sub>**Upper-Left**: Default 'bin' discretization of features from the UMAP-embedding 
+space to the pixel space, represented by red arrows. The number of features mapped 
+to each pixel is shown. **Upper-Middle**: Red arrows indicating the pixel mapping of
+each feature using the 'lsa' discretization method. **Upper-Right**: The number of 
+features in each pixel after 'lsa' discretization. **Bottom-Left**: Generated images 
+for a selection of samples using 'bin' discretization. **Bottom-Right**: enerated 
+images for the same selection of samples using 'lsa' discretization.</sub>
 
 
 ## Classes
-
 The pyDeepInsight package provides classes that aid in the transformation of 
 non-image data into image matrices that can be used to train a CNN. 
 
 <a id='imagetransformer'></a>
 ### ImageTransformer Class
-
 Transforms features to an image matrix using dimensionality reduction and 
 discretization.
 
@@ -70,8 +79,7 @@ discretization='bin', pixels=(224, 224))
 ```
 
 #### Parameters
-
-* **feature_extractor: *{'tsne', 'pca', 'kpca') or a class 
+* **feature_extractor: *{'tsne', 'pca', 'kpca'} or a class 
 instance with method 'fit_transform'***    
 The string values use the same parameters as those 
 described in the [original paper][di]. Providing a class instance is preferred and 
@@ -89,17 +97,16 @@ extracted features and pixels to assign a features to pixels with no overlap.
 In cases where the number of features exceeds the number of pixels, Bisecting K-Means 
 clustering is applied to the feature prior to discretization, with *k* equal to the 
 number of pixels.    
-In cases where 'lsa' takes too long or does not complete, an alternative heuristic
-name the [Asymmetric Greedy Search][ags] can be applied with the 'ags' option. 
-In cases where the number of features exceeds the number of pixels, Bisecting K-Means 
-clustering is applied to the feature prior to discretization, with *k* equal to one less 
-than the number of pixels.
+In cases where 'lsa' takes too long or does not complete, the heuristic method,
+[Asymmetric Greedy Search][ags], can be applied with the 'ags' option. In cases where 
+the number of features exceeds the number of pixels, Bisecting K-Means clustering is 
+applied to the feature prior to discretization, with *k* equal to one less than the 
+number of pixels.
 * **pixels: *int or tuple of ints, default=(224, 224)***    
 The size of the image matrix. A default of 224 × 224 is used as that is the 
 common minimum size expected by [torchvision][tv] and [timm][timm] pre-trained models.
 
 #### Methods
-
 * **fit**(X[, y=None, plot=False]): Compute the mapping of the feature space to the image space.
 * **transform**(X[, y=None, img_format='rgb']): Perform feature space to image space mapping.
 * **fit_transform**(X[, y=None]): Fit to data, then transform it.
@@ -118,12 +125,13 @@ class DeepInsight.CAMFeatureSelector(model, it, target_layer, cam_method="GradCA
 ```
 
 #### Parameters
-* **model**: a [pytorch.nn.Module][pytm] CNN model trained on the output from an
-ImageTransformer instance. The [torchvision.models][tv] subpackage provides many 
-common CNN architectures. 
-* **it**: the [ImageTransformer](#imagetransformer) instance used to generate
-the images used to train the **model**.
-* **target_layer**: the target layer of the **model** on which the CAM is computed.
+* **model: *[pytorch.nn.Module][pytm] class***   
+The CNN model should be trained on the output from an ImageTransformer instance. 
+The [torchvision.models][tv] subpackage provides many common CNN architectures. 
+* **it: *ImageTransformer class***   
+The ImageTransformer instance used to generate the images on which the model was trained.
+* **target_layer: *str or pytorch.nn.Module***    
+The target layer of the **model** on which the CAM is computed.
 Can be specified using the name provided by [nn.Module.named_modules][pytmname] or a 
 by providing a pointer to the layer directly. If no layer is specified, the 
 last non-reduced convolutional layer is selected as determined by 
@@ -133,7 +141,6 @@ François-Guillaume Fernandez.
 [pytorch_grad_cam][tgcam] [\[4\]](#4) package by Jacob Gildenblat. Default is "GradCAM".
 
 #### Methods
-
 * **calculate_class_activations**(X, y, [batch_size=1, flatten_method='mean']): Calculate 
 CAM for each input then flatten for each class.
 * **select_class_features**(cams, [threshold=0.6]): Select features for each class using 
@@ -141,12 +148,10 @@ class-specific CAMs. Input feature coordinates are filtered based on activation 
 coordinates.
 
 ## Example Jupyter Notebooks
-
 * [Classification of TCGA data using SqueezeNet](./examples/pytorch_squeezenet.ipynb)
 * [Feature Selection using GradCAM](./examples/cam_feature_selection.ipynb)
 
 ## References
-
 <a id="1">\[1\]</a>
 Sharma A, Vans E, Shigemizu D, Boroevich KA, & Tsunoda T. DeepInsight: A methodology to transform a non-image data to an
 image for convolution neural network architecture. *Sci Rep* **9**, 11399 (2019). 
@@ -164,6 +169,9 @@ François-Guillaume Fernandez. (2020). TorchCAM: class activation explorer. http
 Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https://github.com/jacobgil/pytorch-grad-cam
 
 [di]: https://doi.org/10.1038/s41598-019-47765-6
+[tcga]: https://www.cancer.gov/ccg/research/genome-sequencing/tcga
+[pca]: https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
+[tsne]: https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html
 [umap]: https://umap-learn.readthedocs.io/en/latest/
 [lsa]: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html
 [ags]: https://doi.org/10.1007/s10878-015-9979-2
@@ -175,7 +183,7 @@ Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https
 [pytmname]: https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.named_modules
 [tcam]: https://github.com/frgfm/torch-cam
 [tgcam]: https://github.com/jacobgil/pytorch-grad-cam
-[disi]: https://static-content.springer.com/esm/art%3A10.1038%2Fs41598-019-47765-6/MediaObjects/41598_2019_47765_MOESM1_ESM.pdf
+[disi]: https://www.nature.com/articles/s41598-019-47765-6#Sec11
 
 # Citation
 ```
