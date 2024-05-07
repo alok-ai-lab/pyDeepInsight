@@ -88,17 +88,17 @@ perplexity in t-SNE, or use of alternative feature extractors, such as [UMAP][um
 * **discretization: *{'bin', 'lsa', 'ags'}, default='bin'***.    
 Defines the
 method for discretizing dimensionally reduced data to pixel coordinates.  
-By default, 'bin', is the method implemented in the [original paper][di] and 
+By default, '**bin**', is the method implemented in the [original paper][di] and 
 maps features to pixels based on a direct scaling of the extracted features to 
 the pixel space.     
-The 'lsa' method applies SciPy's [solution to the linear sum 
+The '**lsa**' method applies SciPy's [solution to the linear sum 
 assignment problem][lsa] to the exponent of the Euclidean distance between the 
 extracted features and pixels to assign a features to pixels with no overlap. 
 In cases where the number of features exceeds the number of pixels, Bisecting K-Means 
 clustering is applied to the feature prior to discretization, with *k* equal to the 
 number of pixels.    
 In cases where 'lsa' takes too long or does not complete, the heuristic method,
-[Asymmetric Greedy Search][ags], can be applied with the 'ags' option. In cases where 
+[Asymmetric Greedy Search][ags], can be applied with the '**ags**' option. In cases where 
 the number of features exceeds the number of pixels, Bisecting K-Means clustering is 
 applied to the feature prior to discretization, with *k* equal to one less than the 
 number of pixels.
