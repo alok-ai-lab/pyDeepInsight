@@ -1,11 +1,10 @@
 import numpy as np
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import TSNE
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import BisectingKMeans
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
-import matplotlib
 import matplotlib.pyplot as plt
 import inspect
 import warnings
@@ -134,8 +133,7 @@ class ImageTransformer:
 
     @staticmethod
     def lsap_heuristic_solution(cost_matrix):
-        return asymmetric_greedy_search(cost_matrix,
-                                        shuffle=True,
+        return asymmetric_greedy_search(cost_matrix, shuffle=True,
                                         minimize=True)
 
     @classmethod
@@ -162,12 +160,12 @@ class ImageTransformer:
             dist = cdist(scaled, px_centers, metric='euclidean')
             labels = np.arange(scaled.shape[0])
         # assignment of features/clusters to pixels
-        lsa = cls.lsap_optimal_solution(dist)
+        lsa = cls.lsap_optimal_solution(dist**2)
         px_assigned = np.empty(scaled.shape, dtype=int)
         for i in range(scaled.shape[0]):
             # The feature at i
-            # Is mapped to the cluster j=clabl[i]
-            # Which is mapped to the pixel center clust_cntr[j]
+            # Is mapped to the cluster j=labels[i]
+            # Which is mapped to the pixel center px_centers[j]
             # Which is mapped to the pixel k = lsa[1][j]
             # For pixel k, x = k % px_size[0] and y = k // px_size[0]
             j = labels[i]
@@ -201,7 +199,7 @@ class ImageTransformer:
             dist = cdist(scaled, px_centers, metric='euclidean')
             labels = np.arange(scaled.shape[0])
         # assignment of features/clusters to pixels
-        lsa = cls.lsap_heuristic_solution(dist)
+        lsa = cls.lsap_heuristic_solution(dist**2)
         px_assigned = np.empty(scaled.shape, dtype=int)
         for i in range(scaled.shape[0]):
             j = labels[i]
@@ -233,7 +231,7 @@ class ImageTransformer:
         """
 
         """
-        kmeans = MiniBatchKMeans(n_clusters=k).fit(positions)
+        kmeans = BisectingKMeans(n_clusters=k).fit(positions)
         cl_labels = kmeans.labels_
         cl_centers = kmeans.cluster_centers_
         dist = cdist(cl_centers, centroids, metric='euclidean')
@@ -269,8 +267,6 @@ class ImageTransformer:
             plt.fill(x_new[chvertices, 0], x_new[chvertices, 1],
                      edgecolor='r', fill=False)
             plt.fill(mbr[:, 0], mbr[:, 1], edgecolor='g', fill=False)
-            plt.gca().set_aspect('equal', adjustable='box')
-            plt.show()
         return self
 
     @property
@@ -321,8 +317,7 @@ class ImageTransformer:
         """Calculate the matrix coordinates of each feature based on the
         pixel dimensions.
         """
-        scaled = self.scale_coordinates(self._xrot, self._pixels)
-        px_coords = self._dm(scaled, self._pixels)
+        px_coords = self._dm(self._xrot, self._pixels)
         self._coords = px_coords
 
     def transform(self, X, img_format='rgb', empty_value=0):
