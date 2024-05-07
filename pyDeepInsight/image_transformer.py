@@ -342,7 +342,7 @@ class ImageTransformer:
         if empty_value != 0:
             img_matrix[:] = empty_value
         for i, c in enumerate(unq):
-            img_matrix[:, *c] = X[:, np.where(idx == i)[0]].mean(axis=1)
+            img_matrix[:, c[0], c[1]] = X[:, np.where(idx == i)[0]].mean(axis=1)
 
         if img_format == 'rgb':
             img_matrix = self._mat_to_rgb(img_matrix)
