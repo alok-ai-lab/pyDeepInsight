@@ -60,7 +60,7 @@ space to the pixel space, represented by red arrows. The number of features mapp
 to each pixel is shown. **Upper-Middle**: Red arrows indicating the pixel mapping of
 each feature using the 'lsa' discretization method. **Upper-Right**: The number of 
 features in each pixel after 'lsa' discretization. **Bottom-Left**: Generated images 
-for a selection of samples using 'bin' discretization. **Bottom-Right**: enerated 
+for a selection of samples using 'bin' discretization. **Bottom-Right**: Generated 
 images for the same selection of samples using 'lsa' discretization.</sub>
 
 
