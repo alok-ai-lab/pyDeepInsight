@@ -17,7 +17,6 @@ class ImageTransformer:
 
     This class takes in data normalized between 0 and 1 and converts it to a
     CNN compatible 'image' matrix
-
     """
 
     def __init__(self, feature_extractor='tsne', discretization='bin',
@@ -475,3 +474,140 @@ class ImageTransformer:
         """
 
         return np.repeat(mat[..., np.newaxis], 3, axis=-1)
+
+
+class MRepImageTransformer:
+    """Transform features to multiple image matrices using dimensionality
+    reduction
+
+    This class takes in data normalized between 0 and 1 and converts it to
+    CNN compatible 'image' matrices
+
+    """
+
+    def __init__(self, feature_extractor, discretization='bin',
+                 pixels=(224, 224)):
+        """Generate an ImageTransformer instance
+
+        Args:
+            feature_extractor: a list of class instances with method
+                `fit_transform` that returns a 2-dimensional array of extracted
+                features.
+            discretization: string of values ('bin', 'assignment'). Defines
+                the method for discretizing dimensionally reduced data to pixel
+                coordinates.
+            pixels: int (square matrix) or tuple of ints (height, width) that
+                defines the size of the image matrix.
+        """
+
+        nreps = len(feature_extractor)
+        if isinstance(discretization, str):
+            discretization = [discretization] * nreps
+        self._its = []
+        for i in range(nreps):
+            it = ImageTransformer(feature_extractor=feature_extractor[i],
+                                  discretization=discretization[i],
+                                  pixels=pixels)
+            self._its.append(it)
+
+    def fit(self, X, y=None, plot=False):
+        """Train the image transformer from the training set (X)
+
+        Args:
+            X: {array-like, sparse matrix} of shape (n_samples, n_features)
+            y: Ignored. Present for continuity with scikit-learn
+            plot: boolean of whether to produce a scatter plot showing the
+                feature reduction, hull points, and minimum bounding rectangle
+        """
+        if plot:
+            [(it.fit(X, plot=True), plt.show()) for it in self._its]
+        else:
+            [it.fit(X, plot=False) for it in self._its]
+
+    def transform(self, X, img_format='rgb', empty_value=0,
+                  collate='manifold', return_index=False):
+        """Transform the input matrix into image matrices
+
+        Args:
+            X: {array-like, sparse matrix} of shape (n_samples, n_features)
+                where n_features matches the training set.
+            img_format: The format of the image matrix to return.
+                'scalar' returns an array of shape (M, N). 'rgb' returns
+                a numpy.ndarray of shape (M, N, 3) that is compatible with PIL.
+            empty_value: numeric value to fill elements where no features are
+                mapped. Default = 0.
+            collate: The order of the representations.
+                'manifold' returns all samples sequentially for each feature
+                extractor (manifold). 'sample' returns all representations for
+                each sample grouped together. 'random' returns the
+                representations shuffled using np.random.
+            return_index: returns an array of the index in X for each
+                representation.
+
+        Returns:
+            A list of n_samples * n_manifolds numpy matrices of dimensions
+            set by the pixel parameter
+        """
+        translist = [it.transform(X, img_format, empty_value)
+                     for it in self._its]
+        if collate == 'manifold':
+            # keep in order of manifolds
+            img_matrices = np.concatenate(translist, axis=0)
+            x_index = np.tile(np.arange(X.shape[0]), len(self._its))
+        elif collate == 'sample':
+            # reorder by sample
+            img_shape = translist[0].shape[1:]
+            img_matrices = np.stack(translist, axis=1).reshape(-1, *img_shape)
+            x_index = np.repeat(np.arange(X.shape[0]), len(self._its))
+        elif collate == 'random':
+            # randomize order
+            img_matrices = np.concatenate(translist, axis=0)
+            x_index = np.tile(np.arange(X.shape[0]), len(self._its))
+            p = np.random.permutation(x_index.shape[0])
+            img_matrices = img_matrices[p]
+            x_index = x_index[p]
+        else:
+            raise ValueError(f"collate method '{collate}' not valid")
+        if return_index:
+            return img_matrices, x_index
+        else:
+            return img_matrices
+
+    def fit_transform(self, X, **kwargs):
+        """Train the image transformer from the training set (X) and return
+        the transformed data.
+
+        Args:
+            X: {array-like, sparse matrix} of shape (n_samples, n_features)
+
+        Returns:
+            An array of n_samples * n_manifolds numpy matrices of dimensions
+            set by the pixel parameter
+        """
+        self.fit(X)
+        img_matrices = self.transform(X, **kwargs)
+        return img_matrices
+
+    @staticmethod
+    def prediction_reduction(y_hat, index, reduction="mean"):
+        """Reduce the prediction score for all representations of a sample
+        to a single score.
+
+        Args:
+            y_hat: the representation prediction score of length n_samples *
+                n_manifolds
+            index: the original sample index for each representation
+            reduction: specifies the reduction to apply across representations:
+                'mean' or 'sum'
+
+        Returns:
+            An array of prediction score of length n_samples ordered by index.
+        """
+        index_set = np.unique(index)
+        if reduction == 'mean':
+            reduced = np.array([np.mean(y_hat[index == k]) for k in index_set])
+        elif reduction == 'sum':
+            reduced = np.array([np.sum(y_hat[index == k]) for k in index_set])
+        else:
+            raise ValueError(f"reduction method '{reduction}' not valid")
+        return reduced
