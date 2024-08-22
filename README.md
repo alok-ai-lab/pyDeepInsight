@@ -107,18 +107,56 @@ The size of the image matrix. A default of 224 × 224 is used as that is the
 common minimum size expected by [torchvision][tv] and [timm][timm] pre-trained models.
 
 #### Methods
-* **fit**(X[, y=None, plot=False]): Compute the mapping of the feature space to the image space.
-* **transform**(X[, y=None, img_format='rgb']): Perform feature space to image space mapping.
+* **fit**(X[, y=None, plot=False]): Compute the mapping of the feature space 
+to the image space.
+* **transform**(X[, y=None, img_format='rgb']): Perform feature space to image 
+space mapping.
 * **fit_transform**(X[, y=None]): Fit to data, then transform it.
 * **pixel**([pixels]): Get or set the image dimensions 
-* **inverse_transform**(img): Transform from the image space back to the feature space.
+* **inverse_transform**(img): Transform from the image space back to the 
+feature space.
+* **feature_density_matrix**: Returns the feature-pixel density matrix 
+for the image space - the number of features mapped to each pixel.
+
+<a id='mrepimagetransformer'></a>
+### MRepImageTransformer Class
+
+Generates multiple image representations per sample using more than one 
+dimensionality reduction algorithm as originally described in [][mrep] [\[2\]](#2)
+
+```python
+class pyDeepInsight.MRepImageTransformer(feature_extractor, 
+discretization='bin', pixels=(224, 224))
+```
+
+#### Parameters
+* **feature_extractor: *A list of class 
+instances, each with method 'fit_transform'***    
+A list of class instances such as [t-SNE][tsne] or [UMAP][umap].
+* **discretization: *{'bin', 'lsa', 'ags'}, default='bin'***.    
+See the description for the ImageTransformer parameter for more details.
+* **pixels: *int or tuple of ints, default=(224, 224)***    
+The size of the image matrix.
+
+#### Methods
+* **fit**(X[, y=None, plot=False]): Compute the mapping of the feature space 
+to the image space.
+* **transform**(X[, y=None, img_format='rgb']): Perform feature space to 
+image space mapping.
+* **fit_transform**(X[, y=None]): Fit to data, then transform it.
+
+The MRepImageTransformer attribute `._its` is a list of ImageTransformer 
+instances through which you can access additional methods, such as 
+`inverse_transform()` and `feature_density_matrix()` for each image 
+representation.
+
 
 <a id='camfeatureselector'></a>
 ### CAMFeatureSelector Class
 
 Extracts important features from a trained PyTorch model using class activation mapping
 (CAM) as proposed in [*DeepFeature: feature selection in nonimage data using 
-convolutional neural network*][df] [\[2\]](#2).
+convolutional neural network*][df] [\[3\]](#3).
 
 ```python
 class DeepInsight.CAMFeatureSelector(model, it, target_layer, cam_method="GradCAM")
@@ -129,16 +167,17 @@ class DeepInsight.CAMFeatureSelector(model, it, target_layer, cam_method="GradCA
 The CNN model should be trained on the output from an ImageTransformer instance. 
 The [torchvision.models][tv] subpackage provides many common CNN architectures. 
 * **it: *ImageTransformer class***   
-The ImageTransformer instance used to generate the images on which the model was trained.
+The ImageTransformer instance used to generate the images on which the model 
+was trained.
 * **target_layer: *str or pytorch.nn.Module***    
 The target layer of the **model** on which the CAM is computed.
 Can be specified using the name provided by [nn.Module.named_modules][pytmname] or a 
 by providing a pointer to the layer directly. If no layer is specified, the 
 last non-reduced convolutional layer is selected as determined by 
-the 'locate_candidate_layer' method of the [TorchCAM][tcam] [\[3\]](#3) package by 
+the 'locate_candidate_layer' method of the [TorchCAM][tcam] [\[4\]](#4) package by 
 François-Guillaume Fernandez.
 * **cam_method**: the name of a CAM method class provided by the 
-[pytorch_grad_cam][tgcam] [\[4\]](#4) package by Jacob Gildenblat. Default is "GradCAM".
+[pytorch_grad_cam][tgcam] [\[5\]](#5) package by Jacob Gildenblat. Default is "GradCAM".
 
 #### Methods
 * **calculate_class_activations**(X, y, [batch_size=1, flatten_method='mean']): Calculate 
@@ -150,22 +189,28 @@ coordinates.
 ## Example Jupyter Notebooks
 * [Classification of TCGA data using SqueezeNet](./examples/pytorch_squeezenet.ipynb)
 * [Feature Selection using GradCAM](./examples/cam_feature_selection.ipynb)
+* [Classification of Madelon with MRepImageTransformer](./examples/mrep_madelon.ipynb)
 
 ## References
 <a id="1">\[1\]</a>
 Sharma A, Vans E, Shigemizu D, Boroevich KA, & Tsunoda T. DeepInsight: A methodology to transform a non-image data to an
-image for convolution neural network architecture. *Sci Rep* **9**, 11399 (2019). 
+image for convolution neural network architecture. *Sci Rep* **9**, 11399 (2019).
 https://doi.org/10.1038/s41598-019-47765-6
 
 <a id="2">\[2\]</a>
+Sharma A, López Y, Jia S, Lysenko A, Boroevich KA, & Tsunoda T. Enhanced analysis of tabular data through 
+Multi-representation DeepInsight. *Sci Rep* **14**, 12851 (2024). 
+https://doi.org/10.1038/s41598-024-63630-7
+
+<a id="3">\[3\]</a>
 Sharma A, Lysenko A, Boroevich KA, Vans E, & Tsunoda T. DeepFeature: feature selection in nonimage data using 
 convolutional neural network, *Briefings in Bioinformatics*, Volume 22, Issue 6, November 2021, bbab297. 
 https://doi.org/10.1093/bib/bbab297
 
-<a id="3">\[3\]</a>
+<a id="4">\[4\]</a>
 François-Guillaume Fernandez. (2020). TorchCAM: class activation explorer. https://github.com/frgfm/torch-cam
 
-<a id="4">\[4\]</a>
+<a id="5">\[5\]</a>
 Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https://github.com/jacobgil/pytorch-grad-cam
 
 [di]: https://doi.org/10.1038/s41598-019-47765-6
