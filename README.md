@@ -63,15 +63,35 @@ features in each pixel after 'lsa' discretization. **Bottom-Left**: Generated im
 for a selection of samples using 'bin' discretization. **Bottom-Right**: Generated 
 images for the same selection of samples using 'lsa' discretization.</sub>
 
+### Basic Usage
 
-## Classes
+The DeepInsight method can be used to generate an image per sample
+
+```python
+fe = sklearn.manifold.TSNE()
+it = pyDeepInsight.ImageTransformer(feature_extractor = fe)
+X_img = it.fit_transform(X)
+```
+
+Or generate multiple image representations per sample
+
+```python
+fe01 = sklearn.manifold.TSNE()
+fe02 = umap.UMAP()
+mit = pyDeepInsight.MRepImageTransformer(feature_extractor = [fe01, fe02])
+X_img = mit.fit_transform(X)
+```
+
+## Class API
+
 The pyDeepInsight package provides classes that aid in the transformation of 
 non-image data into image matrices that can be used to train a CNN. 
 
 <a id='imagetransformer'></a>
 ### ImageTransformer Class
 Transforms features to an image matrix using dimensionality reduction and 
-discretization.
+discretization. See the [TGCA SqueezeNet classification notebook](./examples/pytorch_squeezenet.ipynb) 
+for a detailed usage example.
 
 ```python
 class pyDeepInsight.ImageTransformer(feature_extractor='tsne', 
@@ -122,7 +142,9 @@ for the image space - the number of features mapped to each pixel.
 ### MRepImageTransformer Class
 
 Generates multiple image representations per sample using more than one 
-dimensionality reduction algorithm as originally described in [][mrep] [\[2\]](#2)
+dimensionality reduction algorithm as originally described in [*Enhanced analysis of tabular 
+data through Multi-representation DeepInsight*][mrep] [\[2\]](#2). See the [Madelon classification 
+notebook](./examples/mrep_madelon.ipynb) for a detailed usage example.
 
 ```python
 class pyDeepInsight.MRepImageTransformer(feature_extractor, 
@@ -156,7 +178,9 @@ representation.
 
 Extracts important features from a trained PyTorch model using class activation mapping
 (CAM) as proposed in [*DeepFeature: feature selection in nonimage data using 
-convolutional neural network*][df] [\[3\]](#3).
+convolutional neural network*][df] [\[3\]](#3). See the 
+[TCGA feature selection notebook](./examples/cam_feature_selection.ipynb) for a detailed
+usage example.
 
 ```python
 class DeepInsight.CAMFeatureSelector(model, it, target_layer, cam_method="GradCAM")
@@ -222,6 +246,7 @@ Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https
 [ags]: https://doi.org/10.1007/s10878-015-9979-2
 [tv]: https://pytorch.org/vision/stable/models.html
 [timm]: https://github.com/rwightman/pytorch-image-models
+[mrep]: https://doi.org/10.1038/s41598-024-63630-7
 [df]: https://doi.org/10.1093/bib/bbab297
 [pyt]: https://pytorch.org/
 [pytm]: https://pytorch.org/docs/stable/generated/torch.nn.Module.html
