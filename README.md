@@ -90,7 +90,7 @@ non-image data into image matrices that can be used to train a CNN.
 <a id='imagetransformer'></a>
 ### ImageTransformer Class
 Transforms features to an image matrix using dimensionality reduction and 
-discretization. See the [TGCA SqueezeNet classification notebook](./examples/pytorch_squeezenet.ipynb) 
+discretization. See the [TCGA SqueezeNet classification notebook](./examples/pytorch_squeezenet.ipynb) 
 for a detailed usage example.
 
 ```python
