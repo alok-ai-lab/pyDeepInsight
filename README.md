@@ -130,7 +130,10 @@ common minimum size expected by [torchvision][tv] and [timm][timm] pre-trained m
 * **fit**(X[, y=None, plot=False]): Compute the mapping of the feature space 
 to the image space.
 * **transform**(X[, y=None, img_format='rgb']): Perform feature space to image 
-space mapping.
+space mapping. The ***img_format*** parameter specifies the format of returned image:
+'**scalar**' returns a numpy.ndarray of shape (*N, H, W*), '**rgb**' returns a PIL 
+compatible numpy.ndarray of shape (*N, H, W, 3*), and '**pytorch**' returns a 
+torch.tensor of shape (*N, 3, H, W*).
 * **fit_transform**(X[, y=None]): Fit to data, then transform it.
 * **pixel**([pixels]): Get or set the image dimensions 
 * **inverse_transform**(img): Transform from the image space back to the 

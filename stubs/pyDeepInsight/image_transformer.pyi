@@ -2,6 +2,7 @@ from typing import Any, Optional, Callable
 from typing_extensions import Protocol
 from numpy.typing import ArrayLike
 import numpy as np
+import torch
 
 
 class ManifoldLearner(Protocol):
@@ -74,9 +75,10 @@ class ImageTransformer:
     def _calculate_coords(self) -> None: ...
 
     def transform(self, X: np.ndarray, img_format: str = 'rgb',
-                  empty_value: int = 0) -> np.ndarray: ...
+                  empty_value: int = 0) -> np.ndarray | torch.tensor: ...
 
-    def fit_transform(self, X: np.ndarray, **kwargs: Any) -> np.ndarray: ...
+    def fit_transform(self, X: np.ndarray, **kwargs: Any
+                      ) -> np.ndarray | torch.tensor: ...
 
     def inverse_transform(self, img: np.ndarray) -> np.ndarray: ...
 
@@ -90,6 +92,9 @@ class ImageTransformer:
 
     @staticmethod
     def _mat_to_rgb(mat: np.ndarray) -> np.ndarray: ...
+
+    @staticmethod
+    def _mat_to_pytorch(mat: np.ndarray) -> torch.tensor: ...
 
 
 class MRepImageTransformer:
@@ -106,7 +111,8 @@ class MRepImageTransformer:
     def transform(self, X: np.ndarray, img_format: str = 'rgb',
                   empty_value: int = 0, collate: str = 'sample',
                   return_index: bool = True
-                  ) -> np.ndarray | tuple[np.ndarray, np.ndarray]: ...
+                  ) -> (np.ndarray | tuple[np.ndarray, np.ndarray]
+                        | torch.tensor | tuple[torch.tensor, np.ndarray]): ...
 
     def fit_transform(self, X: np.ndarray, **kwargs: Any) -> np.ndarray: ...
 
