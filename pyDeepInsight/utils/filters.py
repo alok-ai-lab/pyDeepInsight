@@ -216,4 +216,4 @@ class GaborFilter2d(torch.nn.Module):
     @staticmethod
     def tensor_to_pil(img):
         # Convert PyTorch format to PIL format
-        return img.detach().cpu().permute(0, 2, 3, 1).numpy()
+        return img.permute(0, 2, 3, 1).numpy()

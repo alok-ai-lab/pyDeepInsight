@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import TSNE
 from sklearn.cluster import BisectingKMeans
@@ -326,8 +327,9 @@ class ImageTransformer:
             X: {array-like, sparse matrix} of shape (n_samples, n_features)
                 where n_features matches the training set.
             img_format: The format of the image matrix to return.
-                'scalar' returns an array of shape (M, N). 'rgb' returns
-                a numpy.ndarray of shape (M, N, 3) that is compatible with PIL.
+                'scalar' returns an array of shape (N, H, W). 'rgb' returns
+                a numpy.ndarray of shape (N, H, W, 3) that is compatible with
+                PIL. 'pytorch' returns a torch.tensor of shape (N, 3, H, W).
             empty_value: numeric value to fill elements where no features are
                 mapped. Default = 0.
 
@@ -347,6 +349,8 @@ class ImageTransformer:
             img_matrix = self._mat_to_rgb(img_matrix)
         elif img_format == 'scalar':
             pass
+        elif img_format == 'pytorch':
+            img_matrix = self._mat_to_pytorch(img_matrix)
         else:
             raise ValueError(f"'{img_format}' not accepted for img_format")
         return img_matrix
@@ -475,6 +479,20 @@ class ImageTransformer:
 
         return np.repeat(mat[..., np.newaxis], 3, axis=-1)
 
+    @staticmethod
+    def _mat_to_pytorch(mat):
+        """Convert image matrix to numpy rgb format
+
+        Args:
+            mat: {array-like} (..., M, N)
+
+        Returns:
+            An torch.tensor (..., 3, M, N) with original values repeated
+            across RGB channels.
+        """
+
+        return torch.from_numpy(mat).unsqueeze(1).repeat(1, 3, 1, 1)
+
 
 class MRepImageTransformer:
     """Transform features to multiple image matrices using dimensionality
@@ -532,8 +550,9 @@ class MRepImageTransformer:
             X: {array-like, sparse matrix} of shape (n_samples, n_features)
                 where n_features matches the training set.
             img_format: The format of the image matrix to return.
-                'scalar' returns an array of shape (M, N). 'rgb' returns
-                a numpy.ndarray of shape (M, N, 3) that is compatible with PIL.
+                'scalar' returns a numpy.ndarray of shape (N, H, W). 'rgb'
+                returns a PIL compatible numpy.ndarray of shape (N, H, W, 3).
+                'pytorch' returns a torch.tensor of shape (N, 3, H, W).
             empty_value: numeric value to fill elements where no features are
                 mapped. Default = 0.
             collate: The order of the representations.
@@ -568,6 +587,8 @@ class MRepImageTransformer:
             x_index = x_index[p]
         else:
             raise ValueError(f"collate method '{collate}' not valid")
+        if img_format == 'pytorch':
+            img_matrices = torch.from_numpy(img_matrices)
         if return_index:
             return img_matrices, x_index
         else:
