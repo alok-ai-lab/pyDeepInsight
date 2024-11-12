@@ -17,6 +17,7 @@ class ImageTransformer:
     _pixels: tuple[int, int]
     _xrot: np.ndarray
     _coords: np.ndarray
+    DISCRETIZATION_OPTIONS: dict[str, str]
 
     def __init__(self, feature_extractor: str | ManifoldLearner = 'tsne',
                  discretization: str = 'bin',
@@ -36,11 +37,16 @@ class ImageTransformer:
     def coordinate_binning(cls, position: np.ndarray,
                            px_size: tuple[int, int]) -> np.ndarray: ...
 
-    @staticmethod
-    def lsap_optimal_solution(cost_matrix: np.ndarray) -> np.ndarray: ...
+    @classmethod
+    def assignment_preprocessing(cls, position: np.ndarray,
+                                 px_size: tuple[int, int],
+                                 max_assignments: int) -> np.ndarray: ...
 
-    @staticmethod
-    def lsap_heuristic_solution(cost_matrix: np.ndarray) -> np.ndarray: ...
+    @classmethod
+    def assignment_postprocessing(cls, position: np.ndarray,
+                                  px_size: tuple[int, int],
+                                  solution: np.ndarray, labels: np.ndarray
+                                  ) -> np.ndarray: ...
 
     @classmethod
     def coordinate_optimal_assignment(cls, position: np.ndarray,
@@ -100,13 +106,25 @@ class ImageTransformer:
 class MRepImageTransformer:
 
     _its: list[ImageTransformer]
+    _data: np.ndarray | None
+    discretization: str
+    pixels: tuple[int, int]
 
-    def __init__(self, feature_extractor: list[ManifoldLearner],
-                 discretization: str | list[str] = 'bin',
+    def __init__(self, feature_extractor: list[ManifoldLearner] | \
+                                          list[tuple[ManifoldLearner, str]],
+                 discretization: str  = 'bin',
                  pixels: int | tuple[int, int] = (224, 224)) -> None: ...
+
+    def initialize_image_transformer(self, config: ManifoldLearner | \
+                                           tuple[ManifoldLearner, str]) -> \
+            ImageTransformer: ...
 
     def fit(self, X: np.ndarray, y: Optional[ArrayLike] = None,
             plot: bool = False) -> MRepImageTransformer: ...
+
+    def extend_fit(self, feature_extractor: \
+            list[ManifoldLearner] | list[tuple[ManifoldLearner, str]]) -> \
+            None: ...
 
     def transform(self, X: np.ndarray, img_format: str = 'rgb',
                   empty_value: int = 0, collate: str = 'sample',

@@ -20,6 +20,13 @@ class ImageTransformer:
     CNN compatible 'image' matrix
     """
 
+    DISCRETIZATION_OPTIONS = {
+        'bin': 'coordinate_binning',
+        'assignment': 'coordinate_optimal_assignment',
+        'lsa': 'coordinate_optimal_assignment',
+        'ags': 'coordinate_heuristic_assignment'
+    }
+
     def __init__(self, feature_extractor='tsne', discretization='bin',
                  pixels=(224, 224)):
         """Generate an ImageTransformer instance
@@ -98,15 +105,8 @@ class ImageTransformer:
         Returns:
             function
         """
-        if method == 'bin':
-            func = cls.coordinate_binning
-        elif method == 'assignment' or method == 'lsa':
-            func = cls.coordinate_optimal_assignment
-        elif method == 'ags':
-            func = cls.coordinate_heuristic_assignment
-        else:
-            raise ValueError(f"discretization method '{method}' not valid")
-        return func
+        method_name = cls.DISCRETIZATION_OPTIONS[method]
+        return getattr(cls, method_name)
 
     @classmethod
     def coordinate_binning(cls, position, px_size):
@@ -127,14 +127,58 @@ class ImageTransformer:
         px_binned[:, 1][px_binned[:, 1] == px_size[1]] = px_size[1] - 1
         return px_binned
 
-    @staticmethod
-    def lsap_optimal_solution(cost_matrix):
-        return linear_sum_assignment(cost_matrix)
+    @classmethod
+    def assignment_preprocessing(cls, position, px_size, max_assignments):
+        """Cluster features if necessary then calculate the distance
+        of those clusters to all pixels.
 
-    @staticmethod
-    def lsap_heuristic_solution(cost_matrix):
-        return asymmetric_greedy_search(cost_matrix, shuffle=True,
-                                        minimize=True)
+        Args:
+            position: a 2d array of feature coordinates
+            px_size: tuple with image dimensions
+            max_assignments: the maximum number of clusters
+
+        Returns:
+            a tuple of the distance (cost) matrix and the feature to cluster
+            mappings
+        """
+        scaled = cls.scale_coordinates(position, px_size)
+        px_centers = cls.calculate_pixel_centroids(px_size)
+        # calculate distances
+        if scaled.shape[0] > max_assignments:
+            dist, labels = cls.clustered_cdist(scaled, px_centers,
+                                               max_assignments)
+        else:
+            dist = cdist(scaled, px_centers, metric='euclidean')
+            labels = np.arange(scaled.shape[0])
+        return dist, labels
+
+    @classmethod
+    def assignment_postprocessing(cls, position, px_size, solution, labels):
+        """Generate an array of feature pixel coordinates based on the
+        provided solution and labels
+
+        Args:
+            position: a 2d array of feature coordinates
+            px_size: tuple with image dimensions
+            solution: the assignment solution
+            labels: feature to assignment cluster mappings
+
+        Returns:
+            an array of feature pixel coordinates
+        """
+        px_assigned = np.empty(position.shape, dtype=int)
+        for i in range(position.shape[0]):
+            # The feature at i
+            # Is mapped to the cluster j=labels[i]
+            # Which is mapped to the pixel center px_centers[j]
+            # Which is mapped to the pixel k = lsa[1][j]
+            # For pixel k, x = k % px_size[0] and y = k // px_size[0]
+            j = labels[i]
+            ki = solution[j]
+            xi = ki % px_size[0]
+            yi = ki // px_size[0]
+            px_assigned[i] = [yi, xi]
+        return px_assigned
 
     @classmethod
     def coordinate_optimal_assignment(cls, position, px_size):
@@ -149,30 +193,13 @@ class ImageTransformer:
         Returns:
             a 2d array of feature to pixel mappings
         """
-        scaled = cls.scale_coordinates(position, px_size)
-        px_centers = cls.calculate_pixel_centroids(px_size)
         # calculate distances
         k = np.prod(px_size)
-        clustered = scaled.shape[0] > k
-        if clustered:
-            dist, labels = cls.clustered_cdist(scaled, px_centers, k)
-        else:
-            dist = cdist(scaled, px_centers, metric='euclidean')
-            labels = np.arange(scaled.shape[0])
+        dist, labels = cls.assignment_preprocessing(position, px_size, k)
         # assignment of features/clusters to pixels
-        lsa = cls.lsap_optimal_solution(dist**2)
-        px_assigned = np.empty(scaled.shape, dtype=int)
-        for i in range(scaled.shape[0]):
-            # The feature at i
-            # Is mapped to the cluster j=labels[i]
-            # Which is mapped to the pixel center px_centers[j]
-            # Which is mapped to the pixel k = lsa[1][j]
-            # For pixel k, x = k % px_size[0] and y = k // px_size[0]
-            j = labels[i]
-            ki = lsa[1][j]
-            xi = ki % px_size[0]
-            yi = ki // px_size[0]
-            px_assigned[i] = [yi, xi]
+        lsa = linear_sum_assignment(dist**2)[1]
+        px_assigned = cls.assignment_postprocessing(position, px_size,
+                                                    lsa, labels)
         return px_assigned
 
     @classmethod
@@ -188,25 +215,13 @@ class ImageTransformer:
         Returns:
             a 2d array of feature to pixel mappings
         """
-        scaled = cls.scale_coordinates(position, px_size)
-        px_centers = cls.calculate_pixel_centroids(px_size)
         # AGS requires asymmetric assignment so k must be less than pixels
         k = np.prod(px_size) - 1
-        clustered = scaled.shape[0] > k
-        if clustered:
-            dist, labels = cls.clustered_cdist(scaled, px_centers, k)
-        else:
-            dist = cdist(scaled, px_centers, metric='euclidean')
-            labels = np.arange(scaled.shape[0])
+        dist, labels = cls.assignment_preprocessing(position, px_size, k)
         # assignment of features/clusters to pixels
-        lsa = cls.lsap_heuristic_solution(dist**2)
-        px_assigned = np.empty(scaled.shape, dtype=int)
-        for i in range(scaled.shape[0]):
-            j = labels[i]
-            ki = lsa[1][j]
-            xi = ki % px_size[0]
-            yi = ki // px_size[0]
-            px_assigned[i] = [yi, xi]
+        lsa = asymmetric_greedy_search(dist**2, shuffle=True, minimize=True)[1]
+        px_assigned = cls.assignment_postprocessing(position, px_size,
+                                                    lsa, labels)
         return px_assigned
 
     @staticmethod
@@ -228,8 +243,17 @@ class ImageTransformer:
 
     @staticmethod
     def clustered_cdist(positions, centroids, k):
-        """
+        """Cluster the features to k cluster then calculate the distance from
+        the clusters to the (pixel) centroids
 
+        Args:
+            positions: the location of the features
+            centroids: the centre of the pixels
+            k: the number of clusters to generate
+
+        Returns:
+            a tuple of the distance (cost) matrix and the feature to cluster
+            mappings
         """
         kmeans = BisectingKMeans(n_clusters=k).fit(positions)
         cl_labels = kmeans.labels_
@@ -505,28 +529,46 @@ class MRepImageTransformer:
 
     def __init__(self, feature_extractor, discretization='bin',
                  pixels=(224, 224)):
-        """Generate an ImageTransformer instance
+        """Generate an MRepImageTransformer instance
 
         Args:
             feature_extractor: a list of class instances with method
                 `fit_transform` that returns a 2-dimensional array of extracted
-                features.
-            discretization: string of values ('bin', 'assignment'). Defines
-                the method for discretizing dimensionally reduced data to pixel
-                coordinates.
+                features. Alternatively a list of tuples where the first element
+                is the class instance and the second is a discretization option.
+            discretization: string of values ('bin', 'lsa', 'ags'). Defines
+                the default method for discretizing dimensionally reduced
+                data to pixel coordinates if not provided in the
+                `feature_extractor` parameter
             pixels: int (square matrix) or tuple of ints (height, width) that
                 defines the size of the image matrix.
         """
-
-        nreps = len(feature_extractor)
-        if isinstance(discretization, str):
-            discretization = [discretization] * nreps
+        self.discretization = discretization
         self._its = []
-        for i in range(nreps):
-            it = ImageTransformer(feature_extractor=feature_extractor[i],
-                                  discretization=discretization[i],
-                                  pixels=pixels)
+        self.pixels = pixels
+        self._data = None
+        for it_cfg in feature_extractor:
+            it = self.initialize_image_transformer(it_cfg)
             self._its.append(it)
+
+    def initialize_image_transformer(self, config):
+        """Create an ImageTransformer instance
+
+        Args:
+            config: either a 'feature_extractor' or a tuple of
+            'feature_extractor' and the discretization value
+
+        Returns:
+            an instance of ImageTransformer
+        """
+        if isinstance(config, (tuple, list)):
+            return ImageTransformer(feature_extractor=config[0],
+                                    discretization=config[1],
+                                    pixels=self.pixels)
+        else:
+            return ImageTransformer(feature_extractor=config,
+                                    discretization=self.discretization,
+                                    pixels=self.pixels)
 
     def fit(self, X, y=None, plot=False):
         """Train the image transformer from the training set (X)
@@ -537,10 +579,28 @@ class MRepImageTransformer:
             plot: boolean of whether to produce a scatter plot showing the
                 feature reduction, hull points, and minimum bounding rectangle
         """
-        if plot:
-            [(it.fit(X, plot=True), plt.show()) for it in self._its]
-        else:
-            [it.fit(X, plot=False) for it in self._its]
+        self._data = X.copy()
+        for it in self._its:
+            if plot:
+                print(it._fe)
+            it.fit(X, plot=plot)
+            if plot:
+                plt.show()
+
+    def extend_fit(self, feature_extractor):
+        """Add additional transformations to an already trained
+        MRepImageTransformer instance.
+
+        Args:
+            feature_extractor: a list of class instances with method
+                `fit_transform` that returns a 2-dimensional array of extracted
+                features. Alternatively a list of tuples where the first element
+                is the class instance and the second is a discretization option.
+        """
+        for it_cfg in feature_extractor:
+            it = self.initialize_image_transformer(it_cfg)
+            it.fit(self._data)
+            self._its.append(it)
 
     def transform(self, X, img_format='rgb', empty_value=0,
                   collate='manifold', return_index=False):
