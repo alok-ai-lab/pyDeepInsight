@@ -38,6 +38,11 @@ class ImageTransformer:
                            px_size: tuple[int, int]) -> np.ndarray: ...
 
     @classmethod
+    def coordinate_quantile_transformation(cls, position: np.ndarray,
+                                           px_size: tuple[int, int]
+                                           ) -> np.ndarray: ...
+
+    @classmethod
     def assignment_preprocessing(cls, position: np.ndarray,
                                  px_size: tuple[int, int],
                                  max_assignments: int) -> np.ndarray: ...
@@ -129,10 +134,16 @@ class MRepImageTransformer:
     def transform(self, X: np.ndarray, img_format: str = 'rgb',
                   empty_value: int = 0, collate: str = 'sample',
                   return_index: bool = True
-                  ) -> (np.ndarray | tuple[np.ndarray, np.ndarray]
-                        | torch.tensor | tuple[torch.tensor, np.ndarray]): ...
+                  ) -> (np.ndarray
+                        | torch.tensor
+                        | tuple[np.ndarray, np.ndarray, np.ndarray]
+                        | tuple[torch.tensor, np.ndarray, np.ndarray]): ...
 
-    def fit_transform(self, X: np.ndarray, **kwargs: Any) -> np.ndarray: ...
+    def fit_transform(self, X: np.ndarray, **kwargs: Any
+                      ) -> (np.ndarray
+                            | torch.tensor
+                            | tuple[np.ndarray, np.ndarray, np.ndarray]
+                            | tuple[torch.tensor, np.ndarray, np.ndarray]): ...
 
     @staticmethod
     def prediction_reduction(input: np.ndarray, index: np.ndarray,
