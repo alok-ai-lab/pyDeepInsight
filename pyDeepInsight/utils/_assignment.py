@@ -299,11 +299,10 @@ def _sparsify_top_percentile(arr, p):
     top_k = int(arr.shape[1] * p)
     for i in range(arr.shape[0]):
         row = arr[i]
-        top_indices = np.argpartition(row, top_k)[
-                      :top_k]  # indices of top-k smallest values
+        top_indices = np.argpartition(row, top_k)[:top_k]
         mask = np.ones_like(row, dtype=bool)
         mask[top_indices] = False
-        row[mask] = 0  # or np.inf, depending on the sparse algorithm's needs
+        row[mask] = 0
     return csr_matrix(arr)
 
 
