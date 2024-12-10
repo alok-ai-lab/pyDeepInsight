@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from sklearn.preprocessing import quantile_transform
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import TSNE
 from sklearn.cluster import BisectingKMeans
@@ -10,21 +11,40 @@ import matplotlib.pyplot as plt
 import inspect
 import warnings
 
-from .utils import asymmetric_greedy_search
+from .utils import AsymmetricGreedySearch, sparse_assignment
 
 
 class ImageTransformer:
-    """Transform features to an image matrix using dimensionality reduction
+    """Transforms normalized data into a CNN-compatible image. This class takes
+    in data normalized between 0 and 1 and converts it to a CNN compatible
+    'image' matrix. It utilizes dimensionality reduction techniques such as
+    t-SNE, PCA, or Kernel PCA, followed by discretization methods to map the
+    data onto a 2D image format.
 
-    This class takes in data normalized between 0 and 1 and converts it to a
-    CNN compatible 'image' matrix
+    Attributes:
+        _fe (ManifoldLearner): The feature extraction method used for
+            dimensionality reduction. It must have a `fit_transform` method.
+        _dm (function): The discretization method used to assign data points to
+            pixel coordinates.
+        _pixels (tuple): The dimensions of the image matrix (height, width) to
+            which the data will be mapped.
+        _xrot (ndarray): The rotated coordinates of the data after
+            dimensionality reduction.
+        _coords (ndarray): The final pixel coordinates assigned to the data
+            points after discretization.
+        DISCRETIZATION_OPTIONS (dict): A dictionary mapping discretization
+            method names  to their corresponding class methods for pixel
+            assignment.
+
     """
 
     DISCRETIZATION_OPTIONS = {
         'bin': 'coordinate_binning',
+        'qtb': 'coordinate_quantile_transformation',
         'assignment': 'coordinate_optimal_assignment',
         'lsa': 'coordinate_optimal_assignment',
-        'ags': 'coordinate_heuristic_assignment'
+        'ags': 'coordinate_heuristic_assignment',
+        'sla': 'coordinate_sparse_assignment'
     }
 
     def __init__(self, feature_extractor='tsne', discretization='bin',
@@ -32,14 +52,14 @@ class ImageTransformer:
         """Generate an ImageTransformer instance
 
         Args:
-            feature_extractor: string of value ('tsne', 'pca', 'kpca') or a
-                class instance with method `fit_transform` that returns a
-                2-dimensional array of extracted features.
-            discretization: string of values ('bin', 'assignment'). Defines
-                the method for discretizing dimensionally reduced data to pixel
-                coordinates.
-            pixels: int (square matrix) or tuple of ints (height, width) that
-                defines the size of the image matrix.
+            feature_extractor (str or object): string of value ('tsne', 'pca',
+                'kpca') or a class instance with method `fit_transform` that
+                returns a 2-dimensional array of extracted features.
+            discretization (str): Defines the method for discretizing
+                dimensionally reduced data to pixel coordinates. Options are
+                'bin', 'qtb', 'lsa', 'ags', and 'sla'.
+            pixels (int or tuple): The size of the image matrix, either as a
+                square integer or as a tuple (height, width).
         """
         self._fe = self._parse_feature_extractor(feature_extractor)
         self._dm = self._parse_discretization(discretization)
@@ -49,11 +69,11 @@ class ImageTransformer:
 
     @staticmethod
     def _parse_pixels(pixels):
-        """Check and correct pixel parameter
+        """Validates and formats the pixel size parameter.
 
         Args:
-            pixels: int (square matrix) or tuple of ints (height, width) that
-                defines the size of the image matrix.
+            pixels (int or tuple): The size of the image matrix, either as a
+                square integer or as a tuple (height, width).
         """
         if isinstance(pixels, int):
             pixels = (pixels, pixels)
@@ -61,16 +81,15 @@ class ImageTransformer:
 
     @staticmethod
     def _parse_feature_extractor(feature_extractor):
-        """Validate the feature extractor value passed to the
-        constructor method and return correct method
+        """Validates and returns the appropriate feature extraction method.
 
         Args:
-            feature_extractor: string of value ('tsne', 'pca', 'kpca') or a
-                class instance with method `fit_transform` that returns a
-                2-dimensional array of extracted features.
+            feature_extractor (str or object): string of value ('tsne', 'pca',
+                'kpca') or a class instance with method `fit_transform` that
+                returns a 2-dimensional array of extracted features.
 
         Returns:
-            function
+            ManifoldLearner: The feature extraction class instance to be used.
         """
         if isinstance(feature_extractor, str):
             warnings.warn("Defining feature_extractor as a string of 'tsne'," +
@@ -100,25 +119,24 @@ class ImageTransformer:
         constructor method and return correct function
 
         Args:
-            method: string of value ('bin', 'assignment')
+            method (str): Options are 'bin', 'qtb', 'lsa', 'ags', and 'sla'.
 
         Returns:
-            function
+            function: The discretization function corresponding to the method.
         """
         method_name = cls.DISCRETIZATION_OPTIONS[method]
         return getattr(cls, method_name)
 
     @classmethod
     def coordinate_binning(cls, position, px_size):
-        """Determine the pixel locations of each feature based on the overlap of
-        feature position and pixel locations.
+        """Assigns pixel locations based on the binning of feature coordinates.
 
         Args:
-            position: a 2d array of feature coordinates
-            px_size: tuple with image dimensions
+            position (ndarray): A 2D array of feature coordinates.
+            px_size (tuple): The dimensions of the image (height, width).
 
         Returns:
-            a 2d array of feature to pixel mappings
+            ndarray: A 2D array of feature-to-pixel assignments.
         """
         scaled = cls.scale_coordinates(position, px_size)
         px_binned = np.floor(scaled).astype(int)
@@ -128,18 +146,46 @@ class ImageTransformer:
         return px_binned
 
     @classmethod
-    def assignment_preprocessing(cls, position, px_size, max_assignments):
-        """Cluster features if necessary then calculate the distance
-        of those clusters to all pixels.
+    def coordinate_quantile_transformation(cls, position, px_size):
+        """Assigns pixel locations based on quantile-transformed feature
+        coordinates.
 
         Args:
-            position: a 2d array of feature coordinates
-            px_size: tuple with image dimensions
-            max_assignments: the maximum number of clusters
+            position (ndarray): A 2D array of feature coordinates.
+            px_size (tuple): The dimensions of the image (height, width).
 
         Returns:
-            a tuple of the distance (cost) matrix and the feature to cluster
-            mappings
+            ndarray: A 2D array of feature-to-pixel assignments.
+        """
+        trans_height = quantile_transform(position[:, 0, None],
+                                          n_quantiles=px_size[0],
+                                          output_distribution='uniform'
+                                          ).flatten()
+        trans_width = quantile_transform(position[:, 1, None],
+                                         n_quantiles=px_size[1],
+                                         output_distribution='uniform'
+                                         ).flatten()
+        trans_position = np.stack((trans_height, trans_width), axis=1)
+        scaled = cls.scale_coordinates(trans_position, px_size)
+        px_binned = np.floor(scaled).astype(int)
+        # Need to move maximum values into the lower bin
+        px_binned[:, 0] = np.clip(px_binned[:, 0], 0, px_size[0] - 1)
+        px_binned[:, 1] = np.clip(px_binned[:, 1], 0, px_size[1] - 1)
+        return px_binned
+
+    @classmethod
+    def assignment_preprocessing(cls, position, px_size, max_assignments):
+        """Preprocesses features by clustering and calculating the square of
+        the Euclidean distances to the pixel centers.
+
+        Args:
+            position (ndarray): A 2D array of feature coordinates.
+            px_size (tuple): The dimensions of the image (height, width).
+            max_assignments (int): The maximum number of clusters to generate.
+
+        Returns:
+            tuple: A tuple of the distance matrix and the feature-to-cluster
+                mappings.
         """
         scaled = cls.scale_coordinates(position, px_size)
         px_centers = cls.calculate_pixel_centroids(px_size)
@@ -150,21 +196,22 @@ class ImageTransformer:
         else:
             dist = cdist(scaled, px_centers, metric='euclidean')
             labels = np.arange(scaled.shape[0])
+        dist = dist**2
         return dist, labels
 
     @classmethod
     def assignment_postprocessing(cls, position, px_size, solution, labels):
-        """Generate an array of feature pixel coordinates based on the
-        provided solution and labels
+        """Assigns pixel coordinates to features based on the optimization
+        solution.
 
         Args:
-            position: a 2d array of feature coordinates
-            px_size: tuple with image dimensions
-            solution: the assignment solution
-            labels: feature to assignment cluster mappings
+            position (ndarray): A 2D array of feature coordinates.
+            px_size (tuple): The dimensions of the image (height, width).
+            solution (ndarray): The assignment solution.
+            labels (ndarray): The feature-to-assignment cluster mappings.
 
         Returns:
-            an array of feature pixel coordinates
+            ndarray: An array of feature-to-pixel assignments.
         """
         px_assigned = np.empty(position.shape, dtype=int)
         for i in range(position.shape[0]):
@@ -174,52 +221,69 @@ class ImageTransformer:
             # Which is mapped to the pixel k = lsa[1][j]
             # For pixel k, x = k % px_size[0] and y = k // px_size[0]
             j = labels[i]
-            ki = solution[j]
-            xi = ki % px_size[0]
-            yi = ki // px_size[0]
+            ki = solution[j].item()
+            yi, xi = divmod(ki, px_size[0])
             px_assigned[i] = [yi, xi]
         return px_assigned
 
     @classmethod
     def coordinate_optimal_assignment(cls, position, px_size):
-        """Determine the pixel location of each feature using a linear sum
-        assignment problem solution on the Euclidean distances between the
-        features and the pixels centers'
+        """Assigns pixel locations using a linear sum assignment on
+        the distance matrix.
 
         Args:
-            position: a 2d array of feature coordinates
-            px_size: tuple with image dimensions
+            position (ndarray): A 2D array of feature coordinates.
+            px_size (tuple): The dimensions of the image (height, width).
 
         Returns:
-            a 2d array of feature to pixel mappings
+            ndarray: A 2D array of feature-to-pixel assignments.
         """
         # calculate distances
         k = np.prod(px_size)
         dist, labels = cls.assignment_preprocessing(position, px_size, k)
         # assignment of features/clusters to pixels
-        lsa = linear_sum_assignment(dist**2)[1]
+        lsa = linear_sum_assignment(dist)[1]
         px_assigned = cls.assignment_postprocessing(position, px_size,
                                                     lsa, labels)
         return px_assigned
 
     @classmethod
     def coordinate_heuristic_assignment(cls, position, px_size):
-        """Determine the pixel location of each feature using a heuristic linear
-        assignment problem solution on the Euclidean distances between the
-        features and the pixels' centers
+        """Assigns pixel locations using a heuristic approach to the linear
+        assignment problem.
 
         Args:
-            position: a 2d array of feature coordinates
-            px_size: tuple with image dimensions
+            position (ndarray): A 2D array of feature coordinates.
+            px_size (tuple): The dimensions of the image (height, width).
 
         Returns:
-            a 2d array of feature to pixel mappings
+            ndarray: A 2D array of feature-to-pixel assignments.
         """
-        # AGS requires asymmetric assignment so k must be less than pixels
-        k = np.prod(px_size) - 1
+        k = np.prod(px_size)
         dist, labels = cls.assignment_preprocessing(position, px_size, k)
         # assignment of features/clusters to pixels
-        lsa = asymmetric_greedy_search(dist**2, shuffle=True, minimize=True)[1]
+        ags = AsymmetricGreedySearch(dist, minimize=True)
+        max_iter = dist.shape[0]*50
+        lsa = ags.optimize(shuffle=True, maximum_iterations=max_iter)[1]
+        px_assigned = cls.assignment_postprocessing(position, px_size,
+                                                    lsa, labels)
+        return px_assigned
+
+    @classmethod
+    def coordinate_sparse_assignment(cls, position, px_size):
+        """Assigns pixel locations using a sparse assignment method. Only the
+        top 10% of possible assignments are examined for each feature.
+
+        Args:
+            position (ndarray): A 2D array of feature coordinates.
+            px_size (tuple): The dimensions of the image (height, width).
+
+        Returns:
+            ndarray: A 2D array of feature-to-pixel assignments.
+        """
+        k = np.prod(px_size)
+        dist, labels = cls.assignment_preprocessing(position, px_size, k)
+        lsa = sparse_assignment(dist, p=0.1)[1]
         px_assigned = cls.assignment_postprocessing(position, px_size,
                                                     lsa, labels)
         return px_assigned
@@ -229,10 +293,11 @@ class ImageTransformer:
         """Generate a 2d array of the centroid of each pixel
 
         Args:
-            px_size: tuple with image dimensions
+            px_size (tuple): Image dimensions (height, width).
 
         Returns:
-            a 2d array of pixel centroid locations
+            ndarray: A 2D array of pixel centroid locations with shape
+                (height * width, 2).
         """
         px_map = np.empty((np.prod(px_size), 2))
         for i in range(0, px_size[0]):
@@ -243,17 +308,20 @@ class ImageTransformer:
 
     @staticmethod
     def clustered_cdist(positions, centroids, k):
-        """Cluster the features to k cluster then calculate the distance from
-        the clusters to the (pixel) centroids
+        """Cluster the features into k clusters and then calculate the distance
+        from the clusters to the (pixel) centroids.
 
         Args:
-            positions: the location of the features
-            centroids: the centre of the pixels
-            k: the number of clusters to generate
+            positions (ndarray): Location of the features
+                (n_samples, n_features).
+            centroids (ndarray): The center of the pixels (n_pixels, 2).
+            k (int): The number of clusters to generate.
 
         Returns:
-            a tuple of the distance (cost) matrix and the feature to cluster
-            mappings
+            tuple: A tuple containing:
+                - dist (ndarray): Distance (cost) matrix of shape (k, n_pixels).
+                - cl_labels (ndarray): Array of shape (n_samples,) with cluster
+                labels.
         """
         kmeans = BisectingKMeans(n_clusters=k).fit(positions)
         cl_labels = kmeans.labels_
@@ -265,13 +333,13 @@ class ImageTransformer:
         """Train the image transformer from the training set (X)
 
         Args:
-            X: {array-like, sparse matrix} of shape (n_samples, n_features)
-            y: Ignored. Present for continuity with scikit-learn
-            plot: boolean of whether to produce a scatter plot showing the
-                feature reduction, hull points, and minimum bounding rectangle
+            X (array-like): The training data of shape (n_samples, n_features).
+            y: Ignored. Present for continuity with scikit-learn.
+            plot (bool): Whether to produce a scatter plot showing the feature
+                reduction, hull points, and minimum bounding rectangle.
 
         Returns:
-            self: object
+            self: The fitted instance of the image transformer.
         """
         # perform dimensionality reduction
         x_new = self._fe.fit_transform(X.T)
@@ -298,7 +366,7 @@ class ImageTransformer:
         """The image matrix dimensions
 
         Returns:
-            tuple: the image matrix dimensions (height, width)
+            tuple: The image matrix dimensions (height, width)
 
         """
         return self._pixels
@@ -308,8 +376,9 @@ class ImageTransformer:
         """Set the image matrix dimension
 
         Args:
-            pixels: int or tuple with the dimensions (height, width)
-            of the image matrix
+            pixels (int or tuple): The dimensions (height, width) of the image
+                matrix. If an integer is provided, it is treated as a
+                square (height, width).
 
         """
         if isinstance(pixels, int):
@@ -321,15 +390,16 @@ class ImageTransformer:
 
     @staticmethod
     def scale_coordinates(coords, dim_max):
-        """Transforms a list of n-dimensional coordinates by scaling them
-        between zero and the given dimensional maximum
+        """Scale a list of n-dimensional coordinates between zero and the
+        given dimensional maximum.
 
         Args:
-            coords: a 2d ndarray of coordinates
-            dim_max: a list of maximum ranges for each dimension of coords
+            coords (ndarray): A 2D ndarray of coordinates
+                (n_samples, n_features).
+            dim_max (list): Maximum range values for each dimension of `coords`.
 
         Returns:
-            a 2d ndarray of scaled coordinates
+            ndarray: A 2D ndarray of scaled coordinates (n_samples, n_features).
         """
         data_min = coords.min(axis=0)
         data_max = coords.max(axis=0)
@@ -345,21 +415,21 @@ class ImageTransformer:
         self._coords = px_coords
 
     def transform(self, X, img_format='rgb', empty_value=0):
-        """Transform the input matrix into image matrices
+        """Transform the input matrix into image matrices.
 
         Args:
-            X: {array-like, sparse matrix} of shape (n_samples, n_features)
-                where n_features matches the training set.
-            img_format: The format of the image matrix to return.
-                'scalar' returns an array of shape (N, H, W). 'rgb' returns
-                a numpy.ndarray of shape (N, H, W, 3) that is compatible with
-                PIL. 'pytorch' returns a torch.tensor of shape (N, 3, H, W).
-            empty_value: numeric value to fill elements where no features are
-                mapped. Default = 0.
+            X (array-like): Input matrix of shape (n_samples, n_features) where
+                n_features matches the training set.
+            img_format (str): The format of the image matrix to return.
+                - 'scalar': returns a matrix of shape (n_samples, H, W).
+                - 'rgb': returns a ndarray of shape (n_samples, H, W, 3).
+                - 'pytorch': returns a tensor of shape (n_samples, 3, H, W).
+            empty_value (int or float): Numeric value to fill elements where no
+                features are mapped. Default is 0.
 
         Returns:
-            A list of n_samples numpy matrices of dimensions set by
-            the pixel parameter
+            ndarray or Tensor: A list of image matrices with dimensions
+                defined by `pixels`.
         """
         unq, idx, cnt = np.unique(self._coords, return_inverse=True,
                                   return_counts=True, axis=0)
@@ -384,11 +454,11 @@ class ImageTransformer:
         the transformed data.
 
         Args:
-            X: {array-like, sparse matrix} of shape (n_samples, n_features)
+            X (array-like): The training data of shape (n_samples, n_features).
 
         Returns:
-            A list of n_samples numpy matrices of dimensions set by
-            the pixel parameter
+            ndarray or Tensor: A list of image matrices with dimensions
+                defined by `pixels`.
         """
         self.fit(X)
         return self.transform(X, **kwargs)
@@ -396,11 +466,12 @@ class ImageTransformer:
     def inverse_transform(self, img):
         """Transform an image layer back to its original space.
             Args:
-                img:
+                img (ndarray): Image matrix of shape (B*, H, W, C*) where B and
+                    C are optional.
 
             Returns:
-                A list of n_samples numpy matrices of dimensions set by
-                the pixel parameter
+                ndarray: The transformed feature matrix of shape
+                    (n_samples, n_features).
         """
         if img.ndim == 2 and img.shape == self._pixels:
             X = img[self._coords[:, 0], self._coords[:, 1]]
@@ -417,38 +488,35 @@ class ImageTransformer:
         return X
 
     def feature_density_matrix(self):
-        """Generate image matrix with feature counts per pixel
+        """Generate image matrix with feature counts per pixel.
 
         Returns:
-            img_matrix (ndarray): matrix with feature counts per pixel
+            ndarray: Matrix with feature counts per pixel of shape (H, W).
         """
         fdmat = np.zeros(self._pixels)
         np.add.at(fdmat, tuple(self._coords.T), 1)
         return fdmat
 
     def coords(self):
-        """Get feature coordinates
+        """Get feature coordinates.
 
         Returns:
-            ndarray: the pixel coordinates for features
+            ndarray: Pixel coordinates for features.
         """
         return self._coords.copy()
 
     @staticmethod
     def _minimum_bounding_rectangle(hull_points):
-        """Find the smallest bounding rectangle for a set of points.
-
-        Modified from JesseBuesking at https://stackoverflow.com/a/33619018
-        Returns a set of points representing the corners of the bounding box.
+        """Find the smallest bounding rectangle for a set of points. Modified
+        from JesseBuesking at https://stackoverflow.com/a/33619018.
 
         Args:
-            hull_points : nx2 matrix of hull coordinates
+            hull_points (ndarray): nx2 matrix of hull coordinates.
 
         Returns:
-            (tuple): tuple containing
-                coords (ndarray): coordinates of the corners of the rectangle
-                rotmat (ndarray): rotation matrix to align edges of rectangle
-                    to x and y
+            tuple: A tuple containing:
+                - coords (ndarray): Coordinates of the corners of the rectangle.
+                - rotmat (ndarray): Rotation matrix to align edges of rectangle.
         """
 
         pi2 = np.pi / 2
@@ -491,28 +559,26 @@ class ImageTransformer:
 
     @staticmethod
     def _mat_to_rgb(mat):
-        """Convert image matrix to numpy rgb format
+        """Convert image matrix to numpy RGB format.
 
         Args:
-            mat: {array-like} (..., M, N)
+            mat (ndarray): Matrix of shape (..., M, N).
 
         Returns:
-            An numpy.ndarray (..., M, N, 3) with original values repeated
-            across RGB channels.
+            ndarray: RGB formatted matrix of shape (..., M, N, 3).
         """
 
         return np.repeat(mat[..., np.newaxis], 3, axis=-1)
 
     @staticmethod
     def _mat_to_pytorch(mat):
-        """Convert image matrix to numpy rgb format
+        """Convert image matrix to PyTorch tensor format.
 
         Args:
-            mat: {array-like} (..., M, N)
+            mat (ndarray): Matrix of shape (..., M, N).
 
         Returns:
-            An torch.tensor (..., 3, M, N) with original values repeated
-            across RGB channels.
+            Tensor: Tensor of shape (..., 3, M, N).
         """
 
         return torch.from_numpy(mat).unsqueeze(1).repeat(1, 3, 1, 1)
@@ -520,28 +586,26 @@ class ImageTransformer:
 
 class MRepImageTransformer:
     """Transform features to multiple image matrices using dimensionality
-    reduction
-
-    This class takes in data normalized between 0 and 1 and converts it to
-    CNN compatible 'image' matrices
+    reduction. This class takes in data normalized between 0 and 1 and converts
+    it to CNN compatible 'image' matrices
 
     """
 
     def __init__(self, feature_extractor, discretization='bin',
                  pixels=(224, 224)):
-        """Generate an MRepImageTransformer instance
+        """Initialize an MRepImageTransformer instance.
 
         Args:
-            feature_extractor: a list of class instances with method
-                `fit_transform` that returns a 2-dimensional array of extracted
-                features. Alternatively a list of tuples where the first element
-                is the class instance and the second is a discretization option.
-            discretization: string of values ('bin', 'lsa', 'ags'). Defines
-                the default method for discretizing dimensionally reduced
-                data to pixel coordinates if not provided in the
-                `feature_extractor` parameter
-            pixels: int (square matrix) or tuple of ints (height, width) that
-                defines the size of the image matrix.
+            feature_extractor (list): A list of dimensionality reduction class
+                instances with a `fit_transform` method returning a 2D array
+                of extracted features. Alternatively, a list of tuples where
+                the first element is the class instance and the second is
+                a discretization option.
+            discretization (str): specifying the default method for
+                discretizing dimensionally reduced data into pixel coordinates
+                if not provided in `feature_extractor`.
+            pixels (int or tuple): The size of the image matrix, either as a
+                square integer or as a tuple (height, width).
         """
         self.discretization = discretization
         self._its = []
@@ -555,11 +619,11 @@ class MRepImageTransformer:
         """Create an ImageTransformer instance
 
         Args:
-            config: either a 'feature_extractor' or a tuple of
-            'feature_extractor' and the discretization value
+            config: A dimensionality reduction class instance or a tuple
+                containing the instance and a discretization method.
 
         Returns:
-            an instance of ImageTransformer
+            An initialized ImageTransformer instance.
         """
         if isinstance(config, (tuple, list)):
             return ImageTransformer(feature_extractor=config[0],
@@ -574,10 +638,13 @@ class MRepImageTransformer:
         """Train the image transformer from the training set (X)
 
         Args:
-            X: {array-like, sparse matrix} of shape (n_samples, n_features)
-            y: Ignored. Present for continuity with scikit-learn
-            plot: boolean of whether to produce a scatter plot showing the
-                feature reduction, hull points, and minimum bounding rectangle
+            X (array-like): The training data of shape (n_samples, n_features).
+            y: Ignored. Present for continuity with scikit-learn.
+            plot (bool): Whether to produce a scatter plot showing the feature
+                reduction, hull points, and minimum bounding rectangle.
+
+        Returns:
+            self: The fitted instance of the image transformer.
         """
         self._data = X.copy()
         for it in self._its:
@@ -586,16 +653,18 @@ class MRepImageTransformer:
             it.fit(X, plot=plot)
             if plot:
                 plt.show()
+        return self
 
     def extend_fit(self, feature_extractor):
         """Add additional transformations to an already trained
         MRepImageTransformer instance.
 
         Args:
-            feature_extractor: a list of class instances with method
-                `fit_transform` that returns a 2-dimensional array of extracted
-                features. Alternatively a list of tuples where the first element
-                is the class instance and the second is a discretization option.
+            feature_extractor(list): A list of dimensionality reduction class
+                instances with a `fit_transform` method returning a 2D array
+                of extracted features. Alternatively, a list of tuples where
+                the first element is the class instance and the second is
+                a discretization option.
         """
         for it_cfg in feature_extractor:
             it = self.initialize_image_transformer(it_cfg)
@@ -607,50 +676,64 @@ class MRepImageTransformer:
         """Transform the input matrix into image matrices
 
         Args:
-            X: {array-like, sparse matrix} of shape (n_samples, n_features)
-                where n_features matches the training set.
-            img_format: The format of the image matrix to return.
-                'scalar' returns a numpy.ndarray of shape (N, H, W). 'rgb'
-                returns a PIL compatible numpy.ndarray of shape (N, H, W, 3).
-                'pytorch' returns a torch.tensor of shape (N, 3, H, W).
-            empty_value: numeric value to fill elements where no features are
-                mapped. Default = 0.
-            collate: The order of the representations.
-                'manifold' returns all samples sequentially for each feature
-                extractor (manifold). 'sample' returns all representations for
-                each sample grouped together. 'random' returns the
-                representations shuffled using np.random.
-            return_index: returns an array of the index in X for each
-                representation.
+            Args:
+            X (array-like): Input matrix of shape (n_samples, n_features) where
+                n_features matches the training set.
+            img_format (str): The format of the image matrix to return.
+                - 'scalar': returns a matrix of shape (n_samples, H, W).
+                - 'rgb': returns a ndarray of shape (n_samples, H, W, 3).
+                - 'pytorch': returns a tensor of shape (n_samples, 3, H, W).
+            empty_value (int or float): Numeric value to fill elements where no
+                features are mapped. Default is 0.
+            collate (str): The order of the representations.
+                - 'manifold': returns all samples sequentially for each feature
+                    extractor (manifold).
+                - 'sample' returns all representations for each sample grouped
+                    together.
+                - 'random' returns the representations shuffled using np.random.
+            return_index (bool): return two additional arrays. One of the index
+                in X for each representation, and one for the index of the
+                representation (default=False).
 
         Returns:
-            A list of n_samples * n_manifolds numpy matrices of dimensions
-            set by the pixel parameter
+            ndarray or tuple(ndarray): A list of n_samples * n_manifolds numpy
+                matrices of dimensions set by the pixel parameter. Optional
+                additional ndarrays for the index of the samples and
+                representations
         """
-        translist = [it.transform(X, img_format, empty_value)
-                     for it in self._its]
+        translist = []
+        transidx = []
+        for idx, it in enumerate(self._its):
+            translist.append(it.transform(X, img_format, empty_value))
+            transidx.append([idx] * translist[-1].shape[0])
+
         if collate == 'manifold':
             # keep in order of manifolds
             img_matrices = np.concatenate(translist, axis=0)
+            rep_idx = np.concatenate(transidx, axis=0)
             x_index = np.tile(np.arange(X.shape[0]), len(self._its))
         elif collate == 'sample':
             # reorder by sample
             img_shape = translist[0].shape[1:]
             img_matrices = np.stack(translist, axis=1).reshape(-1, *img_shape)
+            rep_idx = np.stack(transidx, axis=1).reshape(-1, *img_shape)
             x_index = np.repeat(np.arange(X.shape[0]), len(self._its))
         elif collate == 'random':
             # randomize order
             img_matrices = np.concatenate(translist, axis=0)
+            rep_idx = np.concatenate(transidx, axis=0)
             x_index = np.tile(np.arange(X.shape[0]), len(self._its))
             p = np.random.permutation(x_index.shape[0])
             img_matrices = img_matrices[p]
+            rep_idx = rep_idx[p]
             x_index = x_index[p]
         else:
             raise ValueError(f"collate method '{collate}' not valid")
+
         if img_format == 'pytorch':
             img_matrices = torch.from_numpy(img_matrices)
         if return_index:
-            return img_matrices, x_index
+            return img_matrices, rep_idx, x_index
         else:
             return img_matrices
 
@@ -659,11 +742,15 @@ class MRepImageTransformer:
         the transformed data.
 
         Args:
-            X: {array-like, sparse matrix} of shape (n_samples, n_features)
+            X (array-like): Input matrix of shape (n_samples, n_features) where
+                n_features matches the training set.
+            kwargs: Additional parameters to be passed to the transform method.
 
         Returns:
-            An array of n_samples * n_manifolds numpy matrices of dimensions
-            set by the pixel parameter
+            ndarray or tuple(ndarray): A list of n_samples * n_manifolds numpy
+                matrices of dimensions set by the pixel parameter. Optional
+                additional ndarrays for the index of the samples and
+                representations
         """
         self.fit(X)
         img_matrices = self.transform(X, **kwargs)
@@ -675,11 +762,11 @@ class MRepImageTransformer:
         to a single score.
 
         Args:
-            y_hat: the representation prediction score of length n_samples *
-                n_manifolds
-            index: the original sample index for each representation
-            reduction: specifies the reduction to apply across representations:
-                'mean' or 'sum'
+            y_hat (ndarray): The representation prediction score of length
+                n_samples * n_manifolds
+            index (ndarray): The original sample index for each representation.
+            reduction (str): specifies the reduction to apply across
+                representations. Options are 'mean' or 'sum'.
 
         Returns:
             An array of prediction score of length n_samples ordered by index.
