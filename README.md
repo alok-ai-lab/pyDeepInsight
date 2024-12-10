@@ -105,23 +105,25 @@ The string values use the same parameters as those
 described in the [original paper][di]. Providing a class instance is preferred and 
 allows for greater customization of the feature extractor, such as modifying 
 perplexity in t-SNE, or use of alternative feature extractors, such as [UMAP][umap].
-* **discretization: *{'bin', 'lsa', 'ags'}, default='bin'***.    
-Defines the
-method for discretizing dimensionally reduced data to pixel coordinates.  
+* **discretization: *{'bin', 'qtb', 'lsa', 'sla', 'ags'}, default='bin'***.    
+Defines the method for discretizing dimensionally reduced data to pixel coordinates.  
 By default, '**bin**', is the method implemented in the [original paper][di] and 
 maps features to pixels based on a direct scaling of the extracted features to 
-the pixel space.     
-The '**lsa**' method applies SciPy's [solution to the linear sum 
-assignment problem][lsa] to the exponent of the Euclidean distance between the 
-extracted features and pixels to assign a features to pixels with no overlap. 
-In cases where the number of features exceeds the number of pixels, Bisecting K-Means 
-clustering is applied to the feature prior to discretization, with *k* equal to the 
-number of pixels.    
-In cases where 'lsa' takes too long or does not complete, the heuristic method,
-[Asymmetric Greedy Search][ags], can be applied with the '**ags**' option. In cases where 
-the number of features exceeds the number of pixels, Bisecting K-Means clustering is 
-applied to the feature prior to discretization, with *k* equal to one less than the 
-number of pixels.
+the pixel space.   
+The '**qtb**' method introduces more spread in the feature-pixel assignments by
+applying a [quantile tranformation][qt] to the feature coordinates prior to assignment.      
+***Assignment Solution Methods***    
+The following methods first construct a feature to pixel-centroid distance matrix
+and then apply a linear assignment solution algorithm to find the minimum total 
+distance to assign each feature to a unique pixel. In cases where the number of 
+features exceeds the number of pixels, Bisecting K-Means clustering is applied 
+to the feature prior to discretization, with *k* equal to the number of pixels.    
+The '**lsa**' option uses SciPy's [solution to the linear sum 
+assignment problem][lsa].    
+The '**sla**' option first extracts the top 10% of pixel assignments then applies
+SciPy's [minimum weight full matching of a bipartite graph][sla].    
+The '**ags**' option implements the heuristic method, [Asymmetric Greedy Search][ags]
+which can be useful in cases where 'lsa' and 'sla' take too long or do not complete.    
 * **pixels: *int or tuple of ints, default=(224, 224)***    
 The size of the image matrix. A default of 224 × 224 is used as that is the 
 common minimum size expected by [torchvision][tv] and [timm][timm] pre-trained models.
@@ -245,7 +247,9 @@ Jacob Gildenblat, & contributors. (2021). PyTorch library for CAM methods. https
 [pca]: https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
 [tsne]: https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html
 [umap]: https://umap-learn.readthedocs.io/en/latest/
+[qt]: https://scikit-learn.org/1.5/modules/generated/sklearn.preprocessing.quantile_transform.html
 [lsa]: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html
+[sla]: https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csgraph.min_weight_full_bipartite_matching.html
 [ags]: https://doi.org/10.1007/s10878-015-9979-2
 [tv]: https://pytorch.org/vision/stable/models.html
 [timm]: https://github.com/rwightman/pytorch-image-models
