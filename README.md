@@ -120,7 +120,7 @@ features exceeds the number of pixels, Bisecting K-Means clustering is applied
 to the feature prior to discretization, with *k* equal to the number of pixels.    
 The '**lsa**' option uses SciPy's [solution to the linear sum 
 assignment problem][lsa].    
-The '**sla**' option first extracts the top 10% of pixel assignments then applies
+The '**sla**' option first extracts the top third of pixel assignments then applies
 SciPy's [minimum weight full matching of a bipartite graph][sla].    
 The '**ags**' option implements the heuristic method, [Asymmetric Greedy Search][ags]
 which can be useful in cases where 'lsa' and 'sla' take too long or do not complete.    

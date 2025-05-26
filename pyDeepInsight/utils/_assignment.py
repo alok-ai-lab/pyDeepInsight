@@ -171,7 +171,7 @@ class AsymmetricGreedySearch:
         """
         available_benefits = self.benefit[row_idx, self.column_mask]
         if available_benefits.size == 0:
-            return -1, 0
+            return -1, 0.
 
         best_avail_idx = available_benefits.argmax()
         best_swap_idx = np.flatnonzero(self.column_mask)[best_avail_idx]
@@ -191,8 +191,7 @@ class AsymmetricGreedySearch:
         """
         num_rows, num_cols = self.benefit.shape
         if num_rows == num_cols:
-            return -1 * np.ones(num_rows, dtype=int), np.zeros(num_rows,
-                                                               dtype=float)
+            return 0.
         available_columns = np.where(self.column_mask)[0]
         available_benefits = self.benefit[:, available_columns]
         best_indices = np.argmax(available_benefits, axis=1)
