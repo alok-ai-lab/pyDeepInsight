@@ -272,7 +272,7 @@ class ImageTransformer:
     @classmethod
     def coordinate_sparse_assignment(cls, position, px_size):
         """Assigns pixel locations using a sparse assignment method. Only the
-        top 10% of possible assignments are examined for each feature.
+        top third of possible assignments are examined for each feature.
 
         Args:
             position (ndarray): A 2D array of feature coordinates.
@@ -283,7 +283,7 @@ class ImageTransformer:
         """
         k = np.prod(px_size)
         dist, labels = cls.assignment_preprocessing(position, px_size, k)
-        lsa = sparse_assignment(dist, p=0.1)[1]
+        lsa = sparse_assignment(dist, p=1/3)[1]
         px_assigned = cls.assignment_postprocessing(position, px_size,
                                                     lsa, labels)
         return px_assigned
@@ -333,7 +333,7 @@ class ImageTransformer:
         """Train the image transformer from the training set (X)
 
         Args:
-            X (array-like): The training data of shape (n_samples, n_features).
+            X (array-like): The training data of shape (n_samples, n_features)
             y: Ignored. Present for continuity with scikit-learn.
             plot (bool): Whether to produce a scatter plot showing the feature
                 reduction, hull points, and minimum bounding rectangle.
