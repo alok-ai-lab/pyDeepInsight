@@ -14,11 +14,11 @@ class CAMFeatureSelector:
 
     def __init__(self, model: nn.Module,
                  it: ImageTransformer,
-                 target_layer: str | nn.Module = None,
+                 target_layer: str | nn.Module | None = None,
                  cam_method: str = "GradCAM") -> None: ...
 
     def _resolve_target_layer(self,
-                              target_layer: str | nn.Module = None
+                              target_layer: str | nn.Module | None = None
                               ) -> nn.Module | None: ...
 
     def compute_cam(self, X: Tensor, y: Tensor,

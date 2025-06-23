@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from functools import partial
 from sklearn.preprocessing import quantile_transform
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import TSNE
@@ -11,7 +12,7 @@ import matplotlib.pyplot as plt
 import inspect
 import warnings
 
-from .utils import AsymmetricGreedySearch, sparse_assignment
+from .utils import sparse_assignment
 
 
 class ImageTransformer:
@@ -41,10 +42,10 @@ class ImageTransformer:
     DISCRETIZATION_OPTIONS = {
         'bin': 'coordinate_binning',
         'qtb': 'coordinate_quantile_transformation',
-        'assignment': 'coordinate_optimal_assignment',
-        'lsa': 'coordinate_optimal_assignment',
-        'ags': 'coordinate_heuristic_assignment',
-        'sla': 'coordinate_sparse_assignment'
+        'lsa': ('coordinate_assignment', 'lsa'),
+        'ags': ('coordinate_assignment', 'ags'),
+        'ags_fast': ('coordinate_assignment', 'ags_fast'),
+        'sla': ('coordinate_assignment', 'sla')
     }
 
     def __init__(self, feature_extractor='tsne', discretization='bin',
@@ -124,8 +125,14 @@ class ImageTransformer:
         Returns:
             function: The discretization function corresponding to the method.
         """
-        method_name = cls.DISCRETIZATION_OPTIONS[method]
-        return getattr(cls, method_name)
+        option = cls.DISCRETIZATION_OPTIONS[method]
+        if isinstance(option, str):
+            disc_func = getattr(cls, option)
+        elif isinstance(option, tuple):
+            method_name, solver_name = option
+            solver = cls._get_solver(solver_name)
+            disc_func = partial(getattr(cls, method_name), solver=solver)
+        return disc_func
 
     @classmethod
     def coordinate_binning(cls, position, px_size):
@@ -172,6 +179,24 @@ class ImageTransformer:
         px_binned[:, 0] = np.clip(px_binned[:, 0], 0, px_size[0] - 1)
         px_binned[:, 1] = np.clip(px_binned[:, 1], 0, px_size[1] - 1)
         return px_binned
+
+    @staticmethod
+    def _get_solver(name):
+        if name == 'lsa':
+            solver = linear_sum_assignment
+        elif name == 'sla':
+            solver = partial(sparse_assignment, p=1/3)
+        elif name == 'ags':
+            from asymmetric_greedy_search import AsymmetricGreedySearch
+            ags = AsymmetricGreedySearch(backend="numba")
+            solver = partial(ags.optimize, minimize=True, shuffle=True)
+        elif name == 'ags_batched':
+            from asymmetric_greedy_search import AsymmetricGreedySearch
+            ags = AsymmetricGreedySearch(backend="numba")
+            solver = partial(ags.optimize, minimize=True, shuffle=True, row_batch_size=5)
+        else:
+            raise ValueError(f"Unknown solver {name}")
+        return solver
 
     @classmethod
     def assignment_preprocessing(cls, position, px_size, max_assignments):
@@ -227,13 +252,14 @@ class ImageTransformer:
         return px_assigned
 
     @classmethod
-    def coordinate_optimal_assignment(cls, position, px_size):
-        """Assigns pixel locations using a linear sum assignment on
+    def coordinate_assignment(cls, position, px_size, solver):
+        """Assigns pixel locations using an assignment solution on
         the distance matrix.
 
         Args:
             position (ndarray): A 2D array of feature coordinates.
             px_size (tuple): The dimensions of the image (height, width).
+            solver (callable): The assignment solution function.
 
         Returns:
             ndarray: A 2D array of feature-to-pixel assignments.
@@ -242,50 +268,9 @@ class ImageTransformer:
         k = np.prod(px_size)
         dist, labels = cls.assignment_preprocessing(position, px_size, k)
         # assignment of features/clusters to pixels
-        lsa = linear_sum_assignment(dist)[1]
+        assignment = solver(dist)[1]
         px_assigned = cls.assignment_postprocessing(position, px_size,
-                                                    lsa, labels)
-        return px_assigned
-
-    @classmethod
-    def coordinate_heuristic_assignment(cls, position, px_size):
-        """Assigns pixel locations using a heuristic approach to the linear
-        assignment problem.
-
-        Args:
-            position (ndarray): A 2D array of feature coordinates.
-            px_size (tuple): The dimensions of the image (height, width).
-
-        Returns:
-            ndarray: A 2D array of feature-to-pixel assignments.
-        """
-        k = np.prod(px_size)
-        dist, labels = cls.assignment_preprocessing(position, px_size, k)
-        # assignment of features/clusters to pixels
-        ags = AsymmetricGreedySearch(dist, minimize=True)
-        max_iter = dist.shape[0]*50
-        lsa = ags.optimize(shuffle=True, maximum_iterations=max_iter)[1]
-        px_assigned = cls.assignment_postprocessing(position, px_size,
-                                                    lsa, labels)
-        return px_assigned
-
-    @classmethod
-    def coordinate_sparse_assignment(cls, position, px_size):
-        """Assigns pixel locations using a sparse assignment method. Only the
-        top third of possible assignments are examined for each feature.
-
-        Args:
-            position (ndarray): A 2D array of feature coordinates.
-            px_size (tuple): The dimensions of the image (height, width).
-
-        Returns:
-            ndarray: A 2D array of feature-to-pixel assignments.
-        """
-        k = np.prod(px_size)
-        dist, labels = cls.assignment_preprocessing(position, px_size, k)
-        lsa = sparse_assignment(dist, p=1/3)[1]
-        px_assigned = cls.assignment_postprocessing(position, px_size,
-                                                    lsa, labels)
+                                                    assignment, labels)
         return px_assigned
 
     @staticmethod

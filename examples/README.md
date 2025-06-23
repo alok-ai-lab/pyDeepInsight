@@ -2,30 +2,36 @@
 
 Example python notebooks for pyDeepInsight.
 
-## [pytorch_squeezenet.ipynb](./pytorch_squeezenet.ipynb)
+## [pyDeepInsight - pyTorch - SqueezeNet](./pytorch_squeezenet.ipynb)
 
-Classification of [TCGA][tcga] cancer type using RNA-seq data (see [data](./data/) directory) via pyDeepInsight. It 
-provides code to convert tabular data to image format using the ImageTransformer class and t-SNE as well 
-as how to train a [torchvision SqueezeNet][tvsn] model using the transformed data.
+Classification of [TCGA][tcga] cancer type using RNA-seq data (see [data](./data/) directory) via **pyDeepInsight**. It 
+provides code to convert tabular data to image format using the `ImageTransformer` class and t-SNE. The transformed 
+is used to train a [torchvision SqueezeNet][tvsn] model.
 
-## [cam_feature_selection.ipynb](./cam_feature_selection.ipynb)
+## [CAM-based Feature Selection](./cam_feature_selection.ipynb)
 
-Abridged classification of the TCGA cancer type in the above example using the ImageTransformer class with 
-UMAP and a [Pytorch Image Models (timm)][timm] ResNet50 model, followed by a detailed explanation on how to use the 
-CAMFeatureSelector class to extract potentially important features.
+An abridged version of the TCGA cancer type classification using **pyDeepInsight**, this notebook applies 
+the `ImageTransformer` class with UMAP and a [timm][timm] ResNet50 model. It also demonstrates the use of 
+the `CAMFeatureSelector` class for identifying potentially important features from the trained model.
 
-## [mrep_madelon.ipynb](./mrep_madelon.ipynb)
+## [MRep-DeepInsight Madelon Dataset](./mrep_madelon.ipynb)
 
-A reproduction of the [Madelon dataset][made] analysis using multiple representation (MRep) DeepInsight as reported in 
- [Sharma A. et al. 2024][mrep]. This example introduces the use of the MRepDeepInsight class as well as two data 
-augmentation methods and includes use of PyTorch [Lightning][ligh] and [Optuna][opta] for training and hyperparameter 
-optimization.
+A reproduction of the [Madelon dataset][made] analysis using **MRep-DeepInsight** as presented 
+in [Sharma et al., 2024][mrep]. This example introduces the `MRepDeepInsight` class, demonstrates two 
+data augmentation techniques, and uses PyTorch [Lightning][ligh] and [Optuna][opta] for model training and 
+hyperparameter optimization.
 
-## [mrep_madelon_tensor.ipynb](./mrep_madelon_tensor.ipynb)
+## [MRepDeepInsight Madelon Dataset (tensor)](./mrep_madelon_tensor.ipynb)
 
-This analysis is identical to `mrep_madelon.ipynb` except data is transformed directly to PyTorch formatted 
-(*N, C, H, W*) images rather than using numpy/PIL formatted (*N, H, W, C*) images as an intermediary. This may be preferred 
-for conciseness when no additional external image filters/transformations methods are to be applied.
+A variant of the previous notebook, this version transforms the input directly into PyTorch-formatted 
+tensors (`N, C, H, W`) rather than using NumPy/PIL-style arrays (`N, H, W, C`). This approach is preferred when 
+no additional external image preprocessing is required, offering a more streamlined pipeline.
+
+## [Discretization Methods](./discretization_methods.ipynb) 
+
+This notebook compares the five primary discretization methods available in **pyDeepInsight**: `bin`, `qtb`, `lsa`, 
+`sla`, and `ags`. It provides a visual demonstration of how each method maps features to pixels, along with a runtime 
+performance comparison.
 
 [tcga]: https://www.cancer.gov/ccg/research/genome-sequencing/tcga
 [tvsn]: https://pytorch.org/vision/main/models/squeezenet.html
