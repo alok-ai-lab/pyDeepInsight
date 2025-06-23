@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyDeepInsight"
+version = "0.1.1"
+description = "A methodology to transform a non-image data to an image for convolution neural network architecture"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Keith A. Boroevich", email = "kaboroevich@gmail.com" }
+]
+
+keywords = [
+    "deep-learning", "feature-visualization", "non-image data",
+    "data transformation", "CNN", "machine-learning", "representation learning",
+    "grad-cam", "pytorch", "scikit-learn", "dimensionality reduction",
+    "t-SNE", "PCA", "image encoding"
+]
+
+dependencies = [
+  "numpy",
+  "scipy",
+  "scikit-learn>=0.22",
+  "matplotlib",
+  "torch",
+  "grad_cam",
+  "torchcam"
+]
+
+[project.optional-dependencies]
+ags = ["assymetric-greedy-search", "numba"]
+
+[project.urls]
+Homepage = "https://github.com/alok-ai-lab/pyDeepInsight"

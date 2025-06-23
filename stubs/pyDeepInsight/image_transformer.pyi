@@ -42,6 +42,9 @@ class ImageTransformer:
                                            px_size: tuple[int, int]
                                            ) -> np.ndarray: ...
 
+    @staticmethod
+    def _get_solver(name: str) -> Callable: ...
+
     @classmethod
     def assignment_preprocessing(cls, position: np.ndarray,
                                  px_size: tuple[int, int],
@@ -54,14 +57,10 @@ class ImageTransformer:
                                   ) -> np.ndarray: ...
 
     @classmethod
-    def coordinate_optimal_assignment(cls, position: np.ndarray,
-                                      px_size: tuple[int, int]
-                                      ) -> np.ndarray: ...
-
-    @classmethod
-    def coordinate_heuristic_assignment(cls, position: np.ndarray,
-                                        px_size: tuple[int, int]
-                                        ) -> np.ndarray: ...
+    def coordinate_assignment(cls, position: np.ndarray,
+                              px_size: tuple[int, int],
+                              solver: Callable,
+                              ) -> np.ndarray: ...
 
     @staticmethod
     def calculate_pixel_centroids(px_size: tuple[int, int]) -> np.ndarray: ...
@@ -86,10 +85,10 @@ class ImageTransformer:
     def _calculate_coords(self) -> None: ...
 
     def transform(self, X: np.ndarray, img_format: str = 'rgb',
-                  empty_value: int = 0) -> np.ndarray | torch.tensor: ...
+                  empty_value: int = 0) -> np.ndarray | torch.Tensor: ...
 
     def fit_transform(self, X: np.ndarray, **kwargs: Any
-                      ) -> np.ndarray | torch.tensor: ...
+                      ) -> np.ndarray | torch.Tensor: ...
 
     def inverse_transform(self, img: np.ndarray) -> np.ndarray: ...
 
@@ -105,7 +104,7 @@ class ImageTransformer:
     def _mat_to_rgb(mat: np.ndarray) -> np.ndarray: ...
 
     @staticmethod
-    def _mat_to_pytorch(mat: np.ndarray) -> torch.tensor: ...
+    def _mat_to_pytorch(mat: np.ndarray) -> torch.Tensor: ...
 
 
 class MRepImageTransformer:
@@ -135,15 +134,15 @@ class MRepImageTransformer:
                   empty_value: int = 0, collate: str = 'sample',
                   return_index: bool = True
                   ) -> (np.ndarray
-                        | torch.tensor
+                        | torch.Tensor
                         | tuple[np.ndarray, np.ndarray, np.ndarray]
-                        | tuple[torch.tensor, np.ndarray, np.ndarray]): ...
+                        | tuple[torch.Tensor, np.ndarray, np.ndarray]): ...
 
     def fit_transform(self, X: np.ndarray, **kwargs: Any
                       ) -> (np.ndarray
-                            | torch.tensor
+                            | torch.Tensor
                             | tuple[np.ndarray, np.ndarray, np.ndarray]
-                            | tuple[torch.tensor, np.ndarray, np.ndarray]): ...
+                            | tuple[torch.Tensor, np.ndarray, np.ndarray]): ...
 
     @staticmethod
     def prediction_reduction(input: np.ndarray, index: np.ndarray,
