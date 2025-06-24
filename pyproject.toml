@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyDeepInsight"
-version = "0.1.1"
+version = "0.2.0"
 description = "A methodology to transform a non-image data to an image for convolution neural network architecture"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -31,6 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+torch = ["torch"]
 ags = ["assymetric-greedy-search", "numba"]
 
 [project.urls]
