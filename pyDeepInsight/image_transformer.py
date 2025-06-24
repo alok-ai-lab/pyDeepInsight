@@ -44,7 +44,7 @@ class ImageTransformer:
         'qtb': 'coordinate_quantile_transformation',
         'lsa': ('coordinate_assignment', 'lsa'),
         'ags': ('coordinate_assignment', 'ags'),
-        'ags_fast': ('coordinate_assignment', 'ags_fast'),
+        'ags_batched': ('coordinate_assignment', 'ags_batched'),
         'sla': ('coordinate_assignment', 'sla')
     }
 
@@ -125,14 +125,18 @@ class ImageTransformer:
         Returns:
             function: The discretization function corresponding to the method.
         """
-        option = cls.DISCRETIZATION_OPTIONS[method]
+        option = cls.DISCRETIZATION_OPTIONS.get(method)
+        if option is None:
+            raise ValueError(f"Unknown discretization method: {method}")
+
         if isinstance(option, str):
-            disc_func = getattr(cls, option)
+            return getattr(cls, option)
         elif isinstance(option, tuple):
             method_name, solver_name = option
             solver = cls._get_solver(solver_name)
-            disc_func = partial(getattr(cls, method_name), solver=solver)
-        return disc_func
+            return partial(getattr(cls, method_name), solver=solver)
+        else:
+            raise TypeError(f"Invalid format for discretization option: {option}")
 
     @classmethod
     def coordinate_binning(cls, position, px_size):
@@ -265,7 +269,7 @@ class ImageTransformer:
             ndarray: A 2D array of feature-to-pixel assignments.
         """
         # calculate distances
-        k = np.prod(px_size)
+        k = int(np.prod(px_size))
         dist, labels = cls.assignment_preprocessing(position, px_size, k)
         # assignment of features/clusters to pixels
         assignment = solver(dist)[1]

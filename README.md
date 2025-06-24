@@ -7,7 +7,15 @@ give the same results as the published MatLab code and should be considered
 experimental.
 
 ## Installation
-    python3 -m pip -q install git+https://github.com/alok-ai-lab/pyDeepInsight.git#egg=pyDeepInsight
+You can install the latest stable release of **pyDeepInsight** from PyPI:
+```bash
+python3 -m pip install pyDeepInsight
+```
+If you want the latest development version directly from GitHub:
+```bash
+python3 -m pip install git+https://github.com/alok-ai-lab/pyDeepInsight.git#egg=pyDeepInsight
+```
+
 
 ## Overview
 DeepInsight is a methodology to transform non-image data into image format 
@@ -215,10 +223,7 @@ CAM for each input then flatten for each class.
 class-specific CAMs. Input feature coordinates are filtered based on activation at same 
 coordinates.
 
-## Example Jupyter Notebooks
-* [Classification of TCGA data using SqueezeNet](./examples/pytorch_squeezenet.ipynb)
-* [Feature Selection using GradCAM](./examples/cam_feature_selection.ipynb)
-* [Classification of Madelon with MRepImageTransformer](./examples/mrep_madelon.ipynb)
+## [Example Jupyter Notebooks](./examples)
 
 ## References
 <a id="1">\[1\]</a>
