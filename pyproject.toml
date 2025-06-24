@@ -31,7 +31,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = ["torch"]
 ags = ["assymetric-greedy-search", "numba"]
 
 [project.urls]
