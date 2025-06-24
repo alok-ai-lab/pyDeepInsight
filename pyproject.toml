@@ -31,8 +31,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = ["torch"]
 ags = ["assymetric-greedy-search", "numba"]
 
 [project.urls]
 Homepage = "https://github.com/alok-ai-lab/pyDeepInsight"
+
+[tool.setuptools.packages.find]
+include = ["pyDeepInsight*"]
