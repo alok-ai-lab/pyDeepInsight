@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import inspect
 import warnings
 
-from .utils import sparse_assignment
+from .utils._assignment import sparse_assignment
 
 
 class ImageTransformer:
@@ -25,13 +25,13 @@ class ImageTransformer:
     Attributes:
         _fe (ManifoldLearner): The feature extraction method used for
             dimensionality reduction. It must have a `fit_transform` method.
-        _dm (function): The discretization method used to assign data points to
+        _dm (Callable): The discretization method used to assign data points to
             pixel coordinates.
-        _pixels (tuple): The dimensions of the image matrix (height, width) to
+        _pixels (Tuple[int, int]): The dimensions of the image matrix (height, width) to
             which the data will be mapped.
-        _xrot (ndarray): The rotated coordinates of the data after
+        _xrot (np.ndarray): The rotated coordinates of the data after
             dimensionality reduction.
-        _coords (ndarray): The final pixel coordinates assigned to the data
+        _coords (np.ndarray): The final pixel coordinates assigned to the data
             points after discretization.
         DISCRETIZATION_OPTIONS (dict): A dictionary mapping discretization
             method names  to their corresponding class methods for pixel
