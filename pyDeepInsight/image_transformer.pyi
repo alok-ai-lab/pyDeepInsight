@@ -2,7 +2,7 @@ from typing import Any, Optional, Callable
 from typing_extensions import Protocol
 from numpy.typing import ArrayLike
 import numpy as np
-import torch
+from torch import Tensor
 
 
 class ManifoldLearner(Protocol):
@@ -85,10 +85,10 @@ class ImageTransformer:
     def _calculate_coords(self) -> None: ...
 
     def transform(self, X: np.ndarray, img_format: str = 'rgb',
-                  empty_value: int = 0) -> np.ndarray | torch.Tensor: ...
+                  empty_value: int = 0) -> np.ndarray | Tensor: ...
 
     def fit_transform(self, X: np.ndarray, **kwargs: Any
-                      ) -> np.ndarray | torch.Tensor: ...
+                      ) -> np.ndarray | Tensor: ...
 
     def inverse_transform(self, img: np.ndarray) -> np.ndarray: ...
 
@@ -104,7 +104,7 @@ class ImageTransformer:
     def _mat_to_rgb(mat: np.ndarray) -> np.ndarray: ...
 
     @staticmethod
-    def _mat_to_pytorch(mat: np.ndarray) -> torch.Tensor: ...
+    def _mat_to_pytorch(mat: np.ndarray) -> Tensor: ...
 
 
 class MRepImageTransformer:
@@ -134,15 +134,15 @@ class MRepImageTransformer:
                   empty_value: int = 0, collate: str = 'sample',
                   return_index: bool = True
                   ) -> (np.ndarray
-                        | torch.Tensor
+                        | Tensor
                         | tuple[np.ndarray, np.ndarray, np.ndarray]
-                        | tuple[torch.Tensor, np.ndarray, np.ndarray]): ...
+                        | tuple[Tensor, np.ndarray, np.ndarray]): ...
 
     def fit_transform(self, X: np.ndarray, **kwargs: Any
                       ) -> (np.ndarray
-                            | torch.Tensor
+                            | Tensor
                             | tuple[np.ndarray, np.ndarray, np.ndarray]
-                            | tuple[torch.Tensor, np.ndarray, np.ndarray]): ...
+                            | tuple[Tensor, np.ndarray, np.ndarray]): ...
 
     @staticmethod
     def prediction_reduction(input: np.ndarray, index: np.ndarray,

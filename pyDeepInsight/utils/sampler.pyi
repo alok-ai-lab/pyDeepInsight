@@ -1,14 +1,14 @@
 from typing import Sequence, Iterator, List
-import torch
+from torch import Tensor
 from torch.utils.data.sampler import Sampler
 
 
 class StratifiedEventBatchSampler(Sampler):
 
-    events: torch.Tensor
+    events: Tensor
     batch_size: int
-    events0_idx: torch.Tensor
-    events1_idx: torch.Tensor
+    events0_idx: Tensor
+    events1_idx: Tensor
     _len: int
     batch0_size: int
     batch1_size: int

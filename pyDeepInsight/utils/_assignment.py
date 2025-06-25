@@ -9,7 +9,7 @@ def _sparsify_top_percentile(arr, p):
     smallest top-percentile values in each row.
 
     Args:
-        arr (ndarray): 2D array of shape (n_rows, n_cols) representing the
+        arr (np.ndarray): 2D array of shape (n_rows, n_cols) representing the
             input cost matrix.
         p (float): The fraction (0 < p <= 1) of the smallest values to retain
             per row.
@@ -34,7 +34,7 @@ def sparse_assignment(cost_matrix, p=0.1):
         smallest top-percentile values in each row.
 
         Args:
-            cost_matrix (ndarray): 2D array of shape (n_rows, n_cols)
+            cost_matrix (np.ndarray): 2D array of shape (n_rows, n_cols)
                 representing the cost matrix.
             p (float): The fraction (0 < p <= 1) of the smallest values to
                 retain per row during sparsification.
