@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyDeepInsight"
-version = "0.2.2"
+version = "0.2.3"
 description = "A methodology to transform a non-image data to an image for convolution neural network architecture"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -21,16 +21,15 @@ keywords = [
 ]
 
 dependencies = [
-  "numpy>=1.21",
+  "numpy",
   "scipy",
   "scikit-learn>=0.22",
   "matplotlib",
   "torch",
-  "grad-cam",
-  "torchcam"
 ]
 
 [project.optional-dependencies]
+cam = ["grad-cam", "torchcam"]
 ags = ["asymmetric-greedy-search", "numba"]
 
 [project.urls]
